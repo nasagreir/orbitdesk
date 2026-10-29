@@ -15,11 +15,10 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 On the **Proxmox host** as root — one script, one paste:
 
 ```bash
-ORBITDESK_REPO=https://github.com/YOU/orbitdesk.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOU/orbitdesk/main/proxmox-install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 ```
 
-Swap in your repo / raw URL. Or open [`proxmox-install.sh`](proxmox-install.sh), set `ORBITDESK_REPO` at the top, and paste the **entire file** into the host shell.
+Repo: [github.com/nasagreir/orbitdesk](https://github.com/nasagreir/orbitdesk). Or paste the entire [`proxmox-install.sh`](proxmox-install.sh) file into the host shell.
 
 Creates a Debian 12 LXC, builds OrbitDesk, enables `orbitdesk.service` on port **3456**.
 

@@ -7,26 +7,24 @@ One file: [`proxmox-install.sh`](../../proxmox-install.sh) at the repo root.
 ### One-liner (raw URL)
 
 ```bash
-ORBITDESK_REPO=https://github.com/YOU/orbitdesk.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOU/orbitdesk/main/proxmox-install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 ```
 
-Replace the GitHub URLs with yours (or any HTTPS raw URL that serves `proxmox-install.sh`).
+Repo: https://github.com/nasagreir/orbitdesk
 
 ### Or paste the whole script
 
-1. Open `proxmox-install.sh`
-2. Optionally set `ORBITDESK_REPO=...` near the top
-3. Paste the entire file into the Proxmox host shell and press Enter
+1. Open [`proxmox-install.sh`](../../proxmox-install.sh)
+2. Paste the entire file into the Proxmox host shell and press Enter
 
 ### Or from a host clone
 
 ```bash
-git clone <YOUR_ORBITDESK_GIT_URL> /root/orbitdesk
+git clone https://github.com/nasagreir/orbitdesk.git /root/orbitdesk
 bash /root/orbitdesk/proxmox-install.sh
 ```
 
-(Local clone copies the tree into the CT — no public git URL required.)
+(Local clone copies the tree into the CT without re-cloning from GitHub inside the CT.)
 
 ## After install
 

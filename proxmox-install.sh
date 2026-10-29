@@ -4,15 +4,13 @@
 # =============================================================================
 # Paste this entire file into a Proxmox VE host shell (as root), OR run:
 #
-#   bash -c "$(curl -fsSL https://RAW_URL/proxmox-install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 #
-# Optional before pasting / in the one-liner:
-#   ORBITDESK_REPO=https://github.com/YOU/orbitdesk.git
 # =============================================================================
 set -euo pipefail
 
 # --------------- edit these if you want non-interactive defaults -------------
-ORBITDESK_REPO="${ORBITDESK_REPO:-}"
+ORBITDESK_REPO="${ORBITDESK_REPO:-https://github.com/nasagreir/orbitdesk.git}"
 ORBITDESK_BRANCH="${ORBITDESK_BRANCH:-main}"
 ORBITDESK_PORT="${ORBITDESK_PORT:-3456}"
 ORBITDESK_CTID="${ORBITDESK_CTID:-}"
