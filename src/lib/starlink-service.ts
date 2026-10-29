@@ -1,0 +1,143 @@
+import { getAppConfig, getGrokConfig, getHomeAssistantConfig } from "@/lib/config";
+import { checkGrok } from "@/lib/grok";
+import {
+  callStarlinkService,
+  checkHomeAssistant,
+  fetchStarlinkDevicesFromHa,
+} from "@/lib/home-assistant";
+import { buildMockDashboard, buildMockThroughput } from "@/lib/mock-data";
+import type {
+  DashboardPayload,
+  StarlinkAction,
+  ThroughputPoint,
+} from "@/lib/types";
+
+function synthesizeThroughput(
+  downlink: number,
+  uplink: number,
+): ThroughputPoint[] {
+  const base = buildMockThroughput(4);
+  return base.map((point, index) => {
+    const wobble = 0.85 + ((index % 5) / 20);
+    return {
+      ...point,
+      downlink: Math.max(0, downlink * wobble),
+      uplink: Math.max(0, uplink * (0.9 + ((index % 3) / 30))),
+    };
+  });
+}
+
+export async function getDashboard(): Promise<DashboardPayload> {
+  const { demoModeForced } = getAppConfig();
+  const ha = getHomeAssistantConfig();
+  const grok = getGrokConfig();
+  const grokStatus = await checkGrok();
+
+  if (demoModeForced || !ha.configured) {
+    const demo = buildMockDashboard();
+    demo.status.grok = {
+      configured: grok.configured,
+      reachable: grokStatus.reachable,
+      message: grokStatus.message,
+    };
+    if (ha.configured) {
+      demo.status.homeAssistant = {
+        configured: true,
+        reachable: false,
+        url: ha.url,
+        message: "FORCE_DEMO_MODE is enabled",
+      };
+    }
+    return demo;
+  }
+
+  const haCheck = await checkHomeAssistant();
+  if (!haCheck.reachable) {
+    const demo = buildMockDashboard();
+    demo.status = {
+      mode: "demo",
+      homeAssistant: {
+        configured: true,
+        reachable: false,
+        url: ha.url,
+        message: haCheck.message,
+      },
+      grok: {
+        configured: grok.configured,
+        reachable: grokStatus.reachable,
+        message: grokStatus.message,
+      },
+    };
+    return demo;
+  }
+
+  try {
+    const devices = await fetchStarlinkDevicesFromHa();
+    const primary = devices.find((d) => d.health === "online") ?? devices[0];
+    return {
+      status: {
+        mode: "live",
+        homeAssistant: {
+          configured: true,
+          reachable: true,
+          url: ha.url,
+          message: haCheck.message,
+        },
+        grok: {
+          configured: grok.configured,
+          reachable: grokStatus.reachable,
+          message: grokStatus.message,
+        },
+      },
+      devices,
+      throughput: synthesizeThroughput(
+        primary?.downlinkMbps ?? 0,
+        primary?.uplinkMbps ?? 0,
+      ),
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    const demo = buildMockDashboard();
+    demo.status = {
+      mode: "demo",
+      homeAssistant: {
+        configured: true,
+        reachable: true,
+        url: ha.url,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to map Starlink entities",
+      },
+      grok: {
+        configured: grok.configured,
+        reachable: grokStatus.reachable,
+        message: grokStatus.message,
+      },
+    };
+    return demo;
+  }
+}
+
+export async function runDeviceAction(
+  deviceId: string,
+  action: StarlinkAction,
+): Promise<{ ok: boolean; message: string; demo?: boolean }> {
+  const ha = getHomeAssistantConfig();
+  const { demoModeForced } = getAppConfig();
+
+  if (demoModeForced || !ha.configured) {
+    return {
+      ok: true,
+      demo: true,
+      message: `Demo: ${action} queued for ${deviceId}. Connect Home Assistant to execute for real.`,
+    };
+  }
+
+  const haCheck = await checkHomeAssistant();
+  if (!haCheck.reachable) {
+    return { ok: false, message: haCheck.message };
+  }
+
+  return callStarlinkService(action, deviceId);
+}
