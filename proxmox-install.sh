@@ -234,7 +234,9 @@ id -u "${APP_USER}" &>/dev/null || useradd --system --home-dir "${APP_DIR}" --sh
 mkdir -p "${APP_DIR}"
 
 env_backup=""
+data_backup=""
 [[ -f "${APP_DIR}/.env.local" ]] && { env_backup=$(mktemp); cp "${APP_DIR}/.env.local" "${env_backup}"; }
+[[ -d "${APP_DIR}/data" ]] && { data_backup=$(mktemp -d); cp -a "${APP_DIR}/data/." "${data_backup}/"; }
 find "${APP_DIR}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
 if [[ -n "${SOURCE_ARCHIVE}" && -f "${SOURCE_ARCHIVE}" ]]; then
@@ -248,7 +250,13 @@ else
 fi
 [[ -f "${APP_DIR}/package.json" ]] || err "package.json missing after deploy"
 [[ -n "${env_backup}" ]] && mv "${env_backup}" "${APP_DIR}/.env.local"
+if [[ -n "${data_backup}" ]]; then
+  mkdir -p "${APP_DIR}/data"
+  cp -a "${data_backup}/." "${APP_DIR}/data/"
+  rm -rf "${data_backup}"
+fi
 
+AUTH_SECRET_VALUE="$(openssl rand -hex 32)"
 if [[ ! -f "${APP_DIR}/.env.local" ]]; then
   cat >"${APP_DIR}/.env.local" <<EOF
 HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-}
@@ -256,14 +264,39 @@ HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN:-}
 STARLINK_ENTITY_PREFIX=${STARLINK_ENTITY_PREFIX:-sensor.starlink}
 GROK_API_KEY=${GROK_API_KEY:-}
 POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-30}
+AUTH_SECRET=${AUTH_SECRET_VALUE}
+ORBITDESK_DATA_DIR=${APP_DIR}/data
 EOF
   chmod 640 "${APP_DIR}/.env.local"
+else
+  grep -q '^AUTH_SECRET=' "${APP_DIR}/.env.local" || echo "AUTH_SECRET=${AUTH_SECRET_VALUE}" >>"${APP_DIR}/.env.local"
+  grep -q '^ORBITDESK_DATA_DIR=' "${APP_DIR}/.env.local" || echo "ORBITDESK_DATA_DIR=${APP_DIR}/data" >>"${APP_DIR}/.env.local"
 fi
 
 msg "Building OrbitDesk"
 cd "${APP_DIR}"
 if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
 npm run build
+
+mkdir -p "${APP_DIR}/data"
+chmod 750 "${APP_DIR}/data"
+
+install -m 0755 "${APP_DIR}/scripts/orbitdesk-user" /usr/local/bin/orbitdesk-user
+# Ensure node CLI is executable
+chmod +x "${APP_DIR}/scripts/orbitdesk-user.mjs" || true
+
+# Bootstrap admin if no users exist
+export ORBITDESK_DATA_DIR="${APP_DIR}/data"
+ADMIN_PASS=""
+if [[ ! -f "${APP_DIR}/data/users.json" ]] || ! grep -q '"username"' "${APP_DIR}/data/users.json" 2>/dev/null; then
+  ADMIN_PASS="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+  ORBITDESK_DATA_DIR="${APP_DIR}/data" node "${APP_DIR}/scripts/orbitdesk-user.mjs" create admin "${ADMIN_PASS}"
+  msg "Created login user: admin"
+  msg "Initial password: ${ADMIN_PASS}"
+  msg "Reset later with: orbitdesk-user reset-password admin"
+else
+  msg "Existing OrbitDesk users preserved"
+fi
 
 cat >/etc/systemd/system/orbitdesk.service <<EOF
 [Unit]
@@ -278,6 +311,7 @@ Group=${APP_USER}
 WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=${APP_PORT}
+Environment=ORBITDESK_DATA_DIR=${APP_DIR}/data
 EnvironmentFile=-${APP_DIR}/.env.local
 ExecStart=/usr/bin/npm run start -- --port ${APP_PORT} --hostname 0.0.0.0
 Restart=on-failure
@@ -301,6 +335,8 @@ systemctl --no-pager --full status orbitdesk.service || true
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 msg "Installed — http://${IP:-<ct-ip>}:${APP_PORT}"
 msg "Config: ${APP_DIR}/.env.local"
+msg "Users:  orbitdesk-user list | reset-password <user>"
+[[ -z "${ADMIN_PASS}" ]] || msg "Login as admin / ${ADMIN_PASS}"
 CT_INSTALL_EOF
 }
 

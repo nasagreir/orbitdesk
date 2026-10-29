@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .super-dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -48,6 +48,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Dark mode (default) */
+.dark,
 :root {
   --background: #071018;
   --foreground: #e8eef7;
@@ -81,6 +83,55 @@
   --sidebar-accent-foreground: #e8eef7;
   --sidebar-border: rgb(255 255 255 / 10%);
   --sidebar-ring: #22d3ee;
+}
+
+/* Super dark — pure black canvas, flat panels, muted teal */
+.super-dark {
+  --background: #000000;
+  --foreground: #c8cdd6;
+  --card: #050505;
+  --card-foreground: #c8cdd6;
+  --popover: #050505;
+  --popover-foreground: #c8cdd6;
+  --primary: #2dd4bf;
+  --primary-foreground: #000000;
+  --secondary: #0a0a0a;
+  --secondary-foreground: #c8cdd6;
+  --muted: #0a0a0a;
+  --muted-foreground: #6b7280;
+  --accent: #0a0a0a;
+  --accent-foreground: #c8cdd6;
+  --destructive: #ef4444;
+  --border: rgb(255 255 255 / 6%);
+  --input: rgb(255 255 255 / 8%);
+  --ring: #2dd4bf;
+  --chart-1: #2dd4bf;
+  --chart-2: #22c55e;
+  --chart-3: #eab308;
+  --chart-4: #52525b;
+  --chart-5: #27272a;
+  --sidebar: #000000;
+  --sidebar-foreground: #c8cdd6;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #0a0a0a;
+  --sidebar-accent-foreground: #c8cdd6;
+  --sidebar-border: rgb(255 255 255 / 6%);
+  --sidebar-ring: #2dd4bf;
+}
+
+.super-dark .atmosphere-glow {
+  opacity: 0 !important;
+}
+
+.super-dark .starfield {
+  opacity: 0.35;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(255, 255, 255, 0.18), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(255, 255, 255, 0.12), transparent),
+    linear-gradient(180deg, #000 0%, #050505 100%);
+  animation: none;
 }
 
 @layer base {

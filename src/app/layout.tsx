@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -30,9 +31,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${spaceGrotesk.variable} ${spaceSans.variable} ${plexMono.variable} dark h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-[#071018] text-slate-100">
-        <AppShell>{children}</AppShell>
+      <body className="min-h-full flex flex-col bg-background text-foreground">
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -6,12 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start --port 3456 --hostname 0.0.0.0",
-    "lint": "eslint"
+    "lint": "eslint",
+    "user": "node scripts/orbitdesk-user.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jose": "^6.2.14",
     "lucide-react": "^1.63.0",
     "next": "16.4.3",
     "react": "19.3.0",
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

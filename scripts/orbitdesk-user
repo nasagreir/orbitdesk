@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Wrapper so `orbitdesk-user` works from any cwd in the LXC
+set -euo pipefail
+APP_DIR="${ORBITDESK_APP_DIR:-/opt/orbitdesk}"
+if [[ ! -d "${APP_DIR}" ]]; then
+  # Fallback when developing from a git checkout
+  APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+export ORBITDESK_DATA_DIR="${ORBITDESK_DATA_DIR:-${APP_DIR}/data}"
+exec node "${APP_DIR}/scripts/orbitdesk-user.mjs" "$@"

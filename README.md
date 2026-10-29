@@ -7,6 +7,8 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 - Fleet overview for one or more Starlink dishes (throughput, latency, obstruction, uptime)
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
+- Username/password login with LXC CLI password recovery
+- Dark + super dark themes
 - Demo mode when credentials are missing so you can explore the UI immediately
 - Single pasteable Proxmox LXC installer
 
@@ -18,15 +20,26 @@ On the **Proxmox host** as root — one script, one paste:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 ```
 
-Repo: [github.com/nasagreir/orbitdesk](https://github.com/nasagreir/orbitdesk). Or paste the entire [`proxmox-install.sh`](proxmox-install.sh) file into the host shell.
+Repo: [github.com/nasagreir/orbitdesk](https://github.com/nasagreir/orbitdesk).
 
-Creates a Debian 12 LXC, builds OrbitDesk, enables `orbitdesk.service` on port **3456**.
+Creates a Debian 12 LXC, builds OrbitDesk, enables `orbitdesk.service` on port **3456**, and prints an initial `admin` password.
+
+### Password recovery (LXC CLI)
+
+```bash
+pct enter <CTID>
+orbitdesk-user reset-password admin
+# or: orbitdesk-user create alice
+# or: orbitdesk-user list
+```
 
 ## Quick start (local)
 
 ```bash
 npm install
 cp .env.example .env.local
+# set AUTH_SECRET in .env.local
+npm run user -- create admin
 npm run dev -- --port 3456
 ```
 
@@ -49,8 +62,6 @@ HOME_ASSISTANT_TOKEN=your-token
 GROK_API_KEY=xai-...
 ```
 
-`XAI_API_KEY` is accepted as an alias. Optional: `GROK_MODEL`, `GROK_BASE_URL`.
-
 ## Scripts
 
 | Command | Description |
@@ -58,6 +69,8 @@ GROK_API_KEY=xai-...
 | `npm run dev -- --port 3456` | Dev server |
 | `npm run build` | Production build |
 | `npm run start` | Serve on `0.0.0.0:3456` |
+| `npm run user -- create admin` | Create login user |
+| `npm run user -- reset-password admin` | Recover password |
 | `bash proxmox-install.sh` | Pasteable Proxmox LXC installer |
 
 ## Notes

@@ -28,10 +28,16 @@ bash /root/orbitdesk/proxmox-install.sh
 
 ## After install
 
-Open `http://<container-ip>:3456`
+Open `http://<container-ip>:3456` and sign in with the printed `admin` password.
 
 ```bash
 pct enter <CTID>
+systemctl status orbitdesk
 nano /opt/orbitdesk/.env.local
 systemctl restart orbitdesk
+
+# Password recovery / user admin (LXC CLI)
+orbitdesk-user list
+orbitdesk-user reset-password admin
+orbitdesk-user create alice
 ```
