@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none" role="img" aria-label="Starlink Flat High Performance">
+  <defs>
+    <linearGradient id="flatBody" x1="30" y1="70" x2="210" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#475569"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="208" height="168" rx="28" fill="#020617" opacity=".45"/>
+  <ellipse cx="120" cy="168" rx="80" ry="8" fill="#000" opacity=".35"/>
+  <rect x="34" y="78" width="172" height="58" rx="12" fill="url(#flatBody)" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="46" y="88" width="148" height="38" rx="8" fill="#0b1220"/>
+  <path d="M56 107 H184" stroke="#38bdf8" stroke-opacity=".35" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="120" cy="107" r="7" fill="#67e8f9" opacity=".7"/>
+  <text x="120" y="186" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Flat High Performance</text>
+</svg>

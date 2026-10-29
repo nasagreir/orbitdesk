@@ -1,4 +1,5 @@
 import { getAppConfig, getGrokConfig, getHomeAssistantConfig } from "@/lib/config";
+import { getAllDevicePrefs } from "@/lib/device-prefs";
 import { checkGrok } from "@/lib/grok";
 import {
   callStarlinkService,
@@ -9,8 +10,25 @@ import { buildMockDashboard, buildMockThroughput } from "@/lib/mock-data";
 import type {
   DashboardPayload,
   StarlinkAction,
+  StarlinkDevice,
   ThroughputPoint,
 } from "@/lib/types";
+
+async function applyDevicePrefs(
+  devices: StarlinkDevice[],
+): Promise<StarlinkDevice[]> {
+  const prefs = await getAllDevicePrefs();
+  return devices.map((device) => {
+    const p = prefs[device.id];
+    if (!p) return device;
+    return {
+      ...device,
+      modelId: p.modelId ?? device.modelId,
+      roamEnabled: p.roamEnabled ?? device.roamEnabled,
+      roamNote: p.roamNote ?? device.roamNote,
+    };
+  });
+}
 
 function synthesizeThroughput(
   downlink: number,
@@ -48,6 +66,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
         message: "FORCE_DEMO_MODE is enabled",
       };
     }
+    demo.devices = await applyDevicePrefs(demo.devices);
     return demo;
   }
 
@@ -68,11 +87,12 @@ export async function getDashboard(): Promise<DashboardPayload> {
         message: grokStatus.message,
       },
     };
+    demo.devices = await applyDevicePrefs(demo.devices);
     return demo;
   }
 
   try {
-    const devices = await fetchStarlinkDevicesFromHa();
+    const devices = await applyDevicePrefs(await fetchStarlinkDevicesFromHa());
     const primary = devices.find((d) => d.health === "online") ?? devices[0];
     return {
       status: {
@@ -115,13 +135,14 @@ export async function getDashboard(): Promise<DashboardPayload> {
         message: grokStatus.message,
       },
     };
+    demo.devices = await applyDevicePrefs(demo.devices);
     return demo;
   }
 }
 
 export async function runDeviceAction(
   deviceId: string,
-  action: StarlinkAction,
+  action: StarlinkAction | "roam_on" | "roam_off",
 ): Promise<{ ok: boolean; message: string; demo?: boolean }> {
   const ha = getHomeAssistantConfig();
   const { demoModeForced } = getAppConfig();

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none" role="img" aria-label="Starlink Standard Gen 2">
+  <defs>
+    <linearGradient id="g2Base" x1="50" y1="120" x2="190" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <radialGradient id="g2Dish" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 78) rotate(90) scale(58)">
+      <stop stop-color="#475569"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </radialGradient>
+  </defs>
+  <rect x="16" y="16" width="208" height="168" rx="28" fill="#020617" opacity=".45"/>
+  <ellipse cx="120" cy="170" rx="68" ry="8" fill="#000" opacity=".35"/>
+  <rect x="58" y="118" width="124" height="36" rx="8" fill="url(#g2Base)" stroke="#475569" stroke-width="1.5"/>
+  <path d="M96 118 L108 86 L132 86 L144 118 Z" fill="#111827"/>
+  <circle cx="120" cy="78" r="52" fill="url(#g2Dish)" stroke="#64748b" stroke-width="2"/>
+  <circle cx="120" cy="78" r="28" fill="#0b1220" stroke="#22d3ee" stroke-opacity=".5" stroke-width="1.5"/>
+  <circle cx="120" cy="78" r="8" fill="#67e8f9" opacity=".6"/>
+  <text x="120" y="186" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Standard Gen 2</text>
+</svg>

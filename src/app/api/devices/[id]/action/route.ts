@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runDeviceAction } from "@/lib/starlink-service";
 
 const bodySchema = z.object({
-  action: z.enum(["reboot", "stow", "unstow"]),
+  action: z.enum(["reboot", "stow", "unstow", "roam_on", "roam_off"]),
 });
 
 export async function POST(
@@ -16,7 +16,7 @@ export async function POST(
     const parsed = bodySchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "action must be reboot, stow, or unstow" },
+        { error: "action must be reboot, stow, unstow, roam_on, or roam_off" },
         { status: 400 },
       );
     }

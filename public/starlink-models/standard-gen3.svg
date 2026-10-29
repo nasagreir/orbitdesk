@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none" role="img" aria-label="Starlink Standard Gen 3">
+  <defs>
+    <linearGradient id="g3Body" x1="30" y1="40" x2="210" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#334155"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="g3Top" x1="50" y1="50" x2="190" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64748b"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="208" height="168" rx="28" fill="#020617" opacity=".45"/>
+  <ellipse cx="120" cy="170" rx="70" ry="8" fill="#000" opacity=".35"/>
+  <path d="M52 150 L70 62 H170 L188 150 Z" fill="#111827"/>
+  <rect x="46" y="46" width="148" height="98" rx="16" fill="url(#g3Body)" stroke="#64748b" stroke-width="2"/>
+  <rect x="58" y="58" width="124" height="74" rx="10" fill="url(#g3Top)"/>
+  <path d="M70 78 H170" stroke="#22d3ee" stroke-opacity=".25" stroke-width="6" stroke-linecap="round"/>
+  <path d="M78 98 H162" stroke="#22d3ee" stroke-opacity=".18" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="120" cy="95" r="14" fill="#0f172a" stroke="#67e8f9" stroke-width="1.5"/>
+  <text x="120" y="186" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Standard Gen 3</text>
+</svg>

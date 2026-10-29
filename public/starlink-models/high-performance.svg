@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none" role="img" aria-label="Starlink High Performance">
+  <defs>
+    <radialGradient id="hpDish" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 88) rotate(90) scale(72)">
+      <stop stop-color="#64748b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </radialGradient>
+  </defs>
+  <rect x="16" y="16" width="208" height="168" rx="28" fill="#020617" opacity=".45"/>
+  <ellipse cx="120" cy="170" rx="78" ry="9" fill="#000" opacity=".35"/>
+  <path d="M78 150 L98 108 L142 108 L162 150 Z" fill="#111827"/>
+  <ellipse cx="120" cy="88" rx="78" ry="58" fill="url(#hpDish)" stroke="#94a3b8" stroke-width="2"/>
+  <ellipse cx="120" cy="88" rx="48" ry="34" fill="#0b1220" stroke="#38bdf8" stroke-opacity=".55" stroke-width="1.5"/>
+  <ellipse cx="120" cy="88" rx="18" ry="12" fill="#38bdf8" opacity=".35"/>
+  <text x="120" y="186" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">High Performance</text>
+</svg>

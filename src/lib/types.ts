@@ -1,3 +1,5 @@
+import type { StarlinkModelId } from "@/lib/starlink-models";
+
 export type ConnectionMode = "live" | "demo";
 
 export type DeviceHealth = "online" | "degraded" | "offline" | "unknown";
@@ -20,6 +22,11 @@ export interface StarlinkDevice {
   lastUpdated: string;
   alerts: string[];
   haEntityPrefix?: string;
+  /** Assigned hardware model for visual tracking */
+  modelId?: StarlinkModelId;
+  /** Mini roam / travel mode */
+  roamEnabled?: boolean;
+  roamNote?: string;
 }
 
 export interface ThroughputPoint {

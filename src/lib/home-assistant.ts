@@ -265,10 +265,37 @@ export async function fetchStarlinkDevicesFromHa(): Promise<StarlinkDevice[]> {
 }
 
 export async function callStarlinkService(
-  action: "reboot" | "stow" | "unstow",
+  action: "reboot" | "stow" | "unstow" | "roam_on" | "roam_off",
   deviceId: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const buttonMap: Record<typeof action, string[]> = {
+  if (action === "roam_on" || action === "roam_off") {
+    const entityCandidates = [
+      `switch.starlink_${deviceId}_roam`,
+      `switch.starlink_mini_roam`,
+      `switch.starlink_roam`,
+      `switch.starlink_${deviceId}_roaming`,
+    ];
+    const turnOn = action === "roam_on";
+    const service = turnOn ? "turn_on" : "turn_off";
+    let lastError = "No matching roam switch entity found";
+    for (const entityId of entityCandidates) {
+      const res = await haFetch(`/api/services/switch/${service}`, {
+        method: "POST",
+        body: JSON.stringify({ entity_id: entityId }),
+      });
+      if (res.ok) {
+        return {
+          ok: true,
+          message: `${turnOn ? "Enabled" : "Disabled"} roam via ${entityId}`,
+        };
+      }
+      lastError = `HA ${res.status} for ${entityId}`;
+    }
+    return { ok: false, message: lastError };
+  }
+
+  const dishAction = action;
+  const buttonMap: Record<"reboot" | "stow" | "unstow", string[]> = {
     reboot: [
       `button.starlink_${deviceId}_reboot`,
       `button.starlink_reboot`,
@@ -283,8 +310,8 @@ export async function callStarlinkService(
 
   const candidates =
     deviceId === "default"
-      ? buttonMap[action].filter((id) => !id.includes("_default_"))
-      : buttonMap[action];
+      ? buttonMap[dishAction].filter((id) => !id.includes("_default_"))
+      : buttonMap[dishAction];
 
   let lastError = "No matching button entity found";
   for (const entityId of candidates) {
@@ -298,13 +325,13 @@ export async function callStarlinkService(
     lastError = `HA ${res.status} for ${entityId}`;
   }
 
-  // Fallback: try homeassistant.turn_on style custom services if present
-  const serviceFallback: Record<typeof action, [string, string]> = {
-    reboot: ["starlink", "reboot"],
-    stow: ["starlink", "stow"],
-    unstow: ["starlink", "unstow"],
-  };
-  const [domain, service] = serviceFallback[action];
+  const serviceFallback: Record<"reboot" | "stow" | "unstow", [string, string]> =
+    {
+      reboot: ["starlink", "reboot"],
+      stow: ["starlink", "stow"],
+      unstow: ["starlink", "unstow"],
+    };
+  const [domain, service] = serviceFallback[dishAction];
   const fallback = await haFetch(`/api/services/${domain}/${service}`, {
     method: "POST",
     body: JSON.stringify({ device_id: deviceId }),
