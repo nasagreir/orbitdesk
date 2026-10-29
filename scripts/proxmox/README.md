@@ -1,70 +1,39 @@
-# OrbitDesk on Proxmox (LXC helper)
+# OrbitDesk on Proxmox
 
-Install OrbitDesk as a Debian 12 LXC from the Proxmox **host** shell — same idea as community helper scripts.
+## Paste this on the Proxmox host (root)
 
-## Paste into the Proxmox host
+One file: [`proxmox-install.sh`](../../proxmox-install.sh) at the repo root.
 
-### Option A — clone on the host (best for private repos)
-
-```bash
-git clone <YOUR_ORBITDESK_GIT_URL> /root/orbitdesk
-cd /root/orbitdesk
-bash scripts/proxmox/orbitdesk.sh
-```
-
-The helper copies this checkout into the container (no public raw URL required).
-
-### Option B — one-liner from a raw URL
-
-When `scripts/proxmox/orbitdesk.sh` is reachable over HTTPS:
+### One-liner (raw URL)
 
 ```bash
 ORBITDESK_REPO=https://github.com/YOU/orbitdesk.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOU/orbitdesk/main/scripts/proxmox/orbitdesk.sh)"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOU/orbitdesk/main/proxmox-install.sh)"
 ```
 
-You will be prompted for CT ID, resources, bridge, storage, and optional Home Assistant / Grok credentials.
+Replace the GitHub URLs with yours (or any HTTPS raw URL that serves `proxmox-install.sh`).
 
-## Defaults
+### Or paste the whole script
 
-| Setting | Default |
-| --- | --- |
-| OS | Debian 12 |
-| Cores | 2 |
-| Memory | 2048 MiB |
-| Disk | 8 GiB |
-| Bridge | `vmbr0` |
-| Nesting | enabled |
-| App port | `3456` |
-| App path | `/opt/orbitdesk` |
-| Service | `orbitdesk.service` |
+1. Open `proxmox-install.sh`
+2. Optionally set `ORBITDESK_REPO=...` near the top
+3. Paste the entire file into the Proxmox host shell and press Enter
 
-Override with env vars: `ORBITDESK_CTID`, `ORBITDESK_HOSTNAME`, `ORBITDESK_CORES`, `ORBITDESK_MEMORY`, `ORBITDESK_DISK`, `ORBITDESK_BRIDGE`, `ORBITDESK_STORAGE`, `ORBITDESK_PORT`, `ORBITDESK_REPO`, `ORBITDESK_BRANCH`.
+### Or from a host clone
+
+```bash
+git clone <YOUR_ORBITDESK_GIT_URL> /root/orbitdesk
+bash /root/orbitdesk/proxmox-install.sh
+```
+
+(Local clone copies the tree into the CT — no public git URL required.)
 
 ## After install
 
+Open `http://<container-ip>:3456`
+
 ```bash
 pct enter <CTID>
-systemctl status orbitdesk
 nano /opt/orbitdesk/.env.local
 systemctl restart orbitdesk
 ```
-
-Open `http://<container-ip>:3456`.
-
-## Update
-
-From a host checkout:
-
-```bash
-cd /root/orbitdesk
-git pull
-bash scripts/proxmox/orbitdesk.sh update <CTID>
-```
-
-## Files
-
-| Script | Role |
-| --- | --- |
-| `orbitdesk.sh` | Proxmox host helper — create LXC, push source, run install |
-| `ct-install.sh` | Inside-CT install — Node, build, systemd |

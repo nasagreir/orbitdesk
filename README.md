@@ -8,7 +8,20 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
 - Demo mode when credentials are missing so you can explore the UI immediately
-- Proxmox VE LXC helper script for one-shot host installs
+- Single pasteable Proxmox LXC installer
+
+## Install on Proxmox (paste this)
+
+On the **Proxmox host** as root — one script, one paste:
+
+```bash
+ORBITDESK_REPO=https://github.com/YOU/orbitdesk.git \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOU/orbitdesk/main/proxmox-install.sh)"
+```
+
+Swap in your repo / raw URL. Or open [`proxmox-install.sh`](proxmox-install.sh), set `ORBITDESK_REPO` at the top, and paste the **entire file** into the host shell.
+
+Creates a Debian 12 LXC, builds OrbitDesk, enables `orbitdesk.service` on port **3456**.
 
 ## Quick start (local)
 
@@ -19,27 +32,6 @@ npm run dev -- --port 3456
 ```
 
 Open [http://localhost:3456](http://localhost:3456).
-
-## Install on Proxmox (LXC)
-
-Paste into the **Proxmox host** shell (root):
-
-```bash
-git clone <YOUR_ORBITDESK_GIT_URL> /root/orbitdesk
-cd /root/orbitdesk
-bash scripts/proxmox/orbitdesk.sh
-```
-
-The helper creates a Debian 12 LXC, installs Node, builds OrbitDesk, and enables `orbitdesk.service` on port **3456**.
-
-One-liner when the raw script URL is public:
-
-```bash
-ORBITDESK_REPO=https://github.com/YOU/orbitdesk.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOU/orbitdesk/main/scripts/proxmox/orbitdesk.sh)"
-```
-
-Full options: [scripts/proxmox/README.md](scripts/proxmox/README.md).
 
 ## Connect Home Assistant
 
@@ -52,19 +44,13 @@ HOME_ASSISTANT_URL=http://homeassistant.local:8123
 HOME_ASSISTANT_TOKEN=your-token
 ```
 
-OrbitDesk reads `/api/states`, groups Starlink entities, and maps downlink/uplink/ping/obstruction/uptime. Actions call `button.press` on matching reboot/stow/unstow entities.
-
 ## Connect Grok
-
-Set an xAI API key:
 
 ```env
 GROK_API_KEY=xai-...
 ```
 
 `XAI_API_KEY` is accepted as an alias. Optional: `GROK_MODEL`, `GROK_BASE_URL`.
-
-Without a key, the assistant returns demo replies based on the current fleet snapshot.
 
 ## Scripts
 
@@ -73,8 +59,7 @@ Without a key, the assistant returns demo replies based on the current fleet sna
 | `npm run dev -- --port 3456` | Dev server |
 | `npm run build` | Production build |
 | `npm run start` | Serve on `0.0.0.0:3456` |
-| `npm run lint` | ESLint |
-| `bash scripts/proxmox/orbitdesk.sh` | Create OrbitDesk LXC on Proxmox |
+| `bash proxmox-install.sh` | Pasteable Proxmox LXC installer |
 
 ## Notes
 
