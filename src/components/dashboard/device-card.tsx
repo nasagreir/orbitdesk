@@ -165,7 +165,7 @@ export function DeviceCard({
         <button
           type="button"
           onClick={onSelect}
-          className="relative size-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30 sm:size-28"
+          className="relative size-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-transparent sm:size-28"
           title={model?.name ?? "Assign a Starlink model"}
         >
           {model ? (
@@ -173,7 +173,7 @@ export function DeviceCard({
               src={model.imageSrc}
               alt={model.name}
               fill
-              className="object-contain p-1"
+              className="object-contain p-1.5"
               sizes="112px"
               unoptimized
             />

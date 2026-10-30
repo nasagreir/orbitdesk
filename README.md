@@ -5,7 +5,7 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 ## Features
 
 - Fleet overview for one or more Starlink dishes (throughput, latency, obstruction, uptime)
-- Product photos for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
+- Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP) so thumbnails sit cleanly on dark / super-dark themes
 - Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
@@ -77,5 +77,6 @@ GROK_API_KEY=xai-...
 
 ## Notes
 
+- Model thumbnails are transparent PNGs (Gen 2 / Gen 3 cutouts derived from [pngimg.com Starlink gallery](https://pngimg.com/images/electronics/starlink), CC BY-NC 4.0).
 - Secrets stay server-side; the browser only talks to OrbitDesk API routes.
 - If HA is configured but unreachable (or no Starlink entities exist), the UI falls back to demo dishes and surfaces the connection message.
