@@ -3,7 +3,9 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/setup",
   "/api/auth/login",
+  "/api/auth/setup",
   "/api/auth/me",
   "/api/auth/logout",
 ];
@@ -35,7 +37,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  if (session && pathname === "/login") {
+  if (session && (pathname === "/login" || pathname === "/setup")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

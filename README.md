@@ -5,11 +5,13 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 ## Features
 
 - Fleet overview for one or more Starlink dishes (throughput, latency, obstruction, uptime)
-- Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP) so thumbnails sit cleanly on dark / super-dark themes
+- Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
 - Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
+- First-start landing page to choose your username and password
 - Username/password login with LXC CLI password recovery
+- Safe updates: `orbitdesk-update` backs up first and auto-rolls back if the new build fails
 - Dark + super dark themes
 - Demo mode when credentials are missing so you can explore the UI immediately
 - Single pasteable Proxmox LXC installer
@@ -24,7 +26,17 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main
 
 Repo: [github.com/nasagreir/orbitdesk](https://github.com/nasagreir/orbitdesk).
 
-Creates a Debian 12 LXC, builds OrbitDesk, enables `orbitdesk.service` on port **3456**, and prints an initial `admin` password.
+Creates a Debian 12 LXC, builds OrbitDesk, and enables `orbitdesk.service` on port **3456**. Open the URL and create your operator username / password on the first-start page.
+
+### Update (LXC CLI)
+
+```bash
+pct enter <CTID>
+orbitdesk-update
+# optional: orbitdesk-update --branch main
+```
+
+The updater snapshots the live install under `/var/backups/orbitdesk/` and `/opt/orbitdesk.previous`, builds the new release in staging, swaps it in, then health-checks `http://127.0.0.1:3456/api/auth/me`. If the build or health check fails, it restores the previous version automatically.
 
 ### Password recovery (LXC CLI)
 
@@ -41,11 +53,10 @@ orbitdesk-user reset-password admin
 npm install
 cp .env.example .env.local
 # set AUTH_SECRET in .env.local
-npm run user -- create admin
 npm run dev -- --port 3456
 ```
 
-Open [http://localhost:3456](http://localhost:3456).
+Open [http://localhost:3456](http://localhost:3456) — with no users yet you’ll land on the setup page to choose a username and password.
 
 ## Connect Home Assistant
 
@@ -71,8 +82,9 @@ GROK_API_KEY=xai-...
 | `npm run dev -- --port 3456` | Dev server |
 | `npm run build` | Production build |
 | `npm run start` | Serve on `0.0.0.0:3456` |
-| `npm run user -- create admin` | Create login user |
+| `npm run user -- create admin` | Create login user (CLI) |
 | `npm run user -- reset-password admin` | Recover password |
+| `orbitdesk-update` | Update with backup + auto-rollback (LXC) |
 | `bash proxmox-install.sh` | Pasteable Proxmox LXC installer |
 
 ## Notes

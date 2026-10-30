@@ -233,32 +233,78 @@ node -v; npm -v
 id -u "${APP_USER}" &>/dev/null || useradd --system --home-dir "${APP_DIR}" --shell /usr/sbin/nologin "${APP_USER}"
 mkdir -p "${APP_DIR}"
 
+# Prefer the dedicated updater when OrbitDesk is already installed
+if [[ -f "${APP_DIR}/package.json" && -x "${APP_DIR}/scripts/orbitdesk-update.sh" && -z "${SOURCE_ARCHIVE}" && -n "${REPO_URL}" ]]; then
+  msg "Existing install detected — using orbitdesk-update (backup + rollback)"
+  install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update 2>/dev/null || true
+  ORBITDESK_REPO="${REPO_URL}" ORBITDESK_BRANCH="${REPO_BRANCH}" ORBITDESK_PORT="${APP_PORT}" \
+    bash "${APP_DIR}/scripts/orbitdesk-update.sh" --repo "${REPO_URL}" --branch "${REPO_BRANCH}" --port "${APP_PORT}"
+  exit 0
+fi
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+BACKUP_ROOT=/var/backups/orbitdesk
+BACKUP_DIR="${BACKUP_ROOT}/${STAMP}"
+PREVIOUS="${APP_DIR}.previous"
+STAGING="${APP_DIR}.staging-${STAMP}"
+HAD_PRIOR=0
+
+if [[ -f "${APP_DIR}/package.json" ]]; then
+  HAD_PRIOR=1
+  msg "Backing up existing install before redeploy"
+  mkdir -p "${BACKUP_DIR}"
+  tar -czf "${BACKUP_DIR}/app.tar.gz" \
+    --exclude='./node_modules' --exclude='./.next' --exclude='./.git' \
+    -C "${APP_DIR}" . || true
+  rm -rf "${PREVIOUS}"
+  mkdir -p "${PREVIOUS}"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "${APP_DIR}/" "${PREVIOUS}/"
+  else
+    tar -C "${APP_DIR}" -cf - . | tar -C "${PREVIOUS}" -xf -
+  fi
+fi
+
 env_backup=""
 data_backup=""
 [[ -f "${APP_DIR}/.env.local" ]] && { env_backup=$(mktemp); cp "${APP_DIR}/.env.local" "${env_backup}"; }
 [[ -d "${APP_DIR}/data" ]] && { data_backup=$(mktemp -d); cp -a "${APP_DIR}/data/." "${data_backup}/"; }
-find "${APP_DIR}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
+rollback_prior() {
+  msg "Deploy/build failed — rolling back to previous install"
+  systemctl stop orbitdesk.service 2>/dev/null || true
+  rm -rf "${STAGING}" "${APP_DIR}"
+  if [[ -d "${PREVIOUS}" ]]; then
+    mv "${PREVIOUS}" "${APP_DIR}"
+    chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
+    systemctl start orbitdesk.service 2>/dev/null || true
+    msg "Rollback complete"
+  fi
+  exit 1
+}
+
+rm -rf "${STAGING}"
+mkdir -p "${STAGING}"
 if [[ -n "${SOURCE_ARCHIVE}" && -f "${SOURCE_ARCHIVE}" ]]; then
   msg "Extracting ${SOURCE_ARCHIVE}"
-  tar -xzf "${SOURCE_ARCHIVE}" -C "${APP_DIR}"
+  tar -xzf "${SOURCE_ARCHIVE}" -C "${STAGING}"
 elif [[ -n "${REPO_URL}" ]]; then
   msg "Cloning ${REPO_URL} (${REPO_BRANCH})"
-  git clone --depth 1 --branch "${REPO_BRANCH}" "${REPO_URL}" "${APP_DIR}"
+  git clone --depth 1 --branch "${REPO_BRANCH}" "${REPO_URL}" "${STAGING}"
 else
   err "No ORBITDESK_REPO or source archive"
 fi
-[[ -f "${APP_DIR}/package.json" ]] || err "package.json missing after deploy"
-[[ -n "${env_backup}" ]] && mv "${env_backup}" "${APP_DIR}/.env.local"
+[[ -f "${STAGING}/package.json" ]] || err "package.json missing after deploy"
+[[ -n "${env_backup}" ]] && mv "${env_backup}" "${STAGING}/.env.local"
 if [[ -n "${data_backup}" ]]; then
-  mkdir -p "${APP_DIR}/data"
-  cp -a "${data_backup}/." "${APP_DIR}/data/"
+  mkdir -p "${STAGING}/data"
+  cp -a "${data_backup}/." "${STAGING}/data/"
   rm -rf "${data_backup}"
 fi
 
 AUTH_SECRET_VALUE="$(openssl rand -hex 32)"
-if [[ ! -f "${APP_DIR}/.env.local" ]]; then
-  cat >"${APP_DIR}/.env.local" <<EOF
+if [[ ! -f "${STAGING}/.env.local" ]]; then
+  cat >"${STAGING}/.env.local" <<EOF
 HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-}
 HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN:-}
 STARLINK_ENTITY_PREFIX=${STARLINK_ENTITY_PREFIX:-sensor.starlink}
@@ -267,35 +313,36 @@ POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-30}
 AUTH_SECRET=${AUTH_SECRET_VALUE}
 ORBITDESK_DATA_DIR=${APP_DIR}/data
 EOF
-  chmod 640 "${APP_DIR}/.env.local"
+  chmod 640 "${STAGING}/.env.local"
 else
-  grep -q '^AUTH_SECRET=' "${APP_DIR}/.env.local" || echo "AUTH_SECRET=${AUTH_SECRET_VALUE}" >>"${APP_DIR}/.env.local"
-  grep -q '^ORBITDESK_DATA_DIR=' "${APP_DIR}/.env.local" || echo "ORBITDESK_DATA_DIR=${APP_DIR}/data" >>"${APP_DIR}/.env.local"
+  grep -q '^AUTH_SECRET=' "${STAGING}/.env.local" || echo "AUTH_SECRET=${AUTH_SECRET_VALUE}" >>"${STAGING}/.env.local"
+  grep -q '^ORBITDESK_DATA_DIR=' "${STAGING}/.env.local" || echo "ORBITDESK_DATA_DIR=${APP_DIR}/data" >>"${STAGING}/.env.local"
 fi
 
 msg "Building OrbitDesk"
-cd "${APP_DIR}"
-if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
-npm run build
+cd "${STAGING}"
+if ! { if [[ -f package-lock.json ]]; then npm ci; else npm install; fi; npm run build; }; then
+  if [[ "${HAD_PRIOR}" -eq 1 ]]; then rollback_prior; fi
+  err "Build failed"
+fi
+
+systemctl stop orbitdesk.service 2>/dev/null || true
+rm -rf "${APP_DIR}"
+mv "${STAGING}" "${APP_DIR}"
 
 mkdir -p "${APP_DIR}/data"
 chmod 750 "${APP_DIR}/data"
 
 install -m 0755 "${APP_DIR}/scripts/orbitdesk-user" /usr/local/bin/orbitdesk-user
-# Ensure node CLI is executable
-chmod +x "${APP_DIR}/scripts/orbitdesk-user.mjs" || true
+install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update
+chmod +x "${APP_DIR}/scripts/orbitdesk-user.mjs" "${APP_DIR}/scripts/orbitdesk-update.sh" || true
 
-# Bootstrap admin if no users exist
+# First-start uses the /setup landing page — do not auto-create users
 export ORBITDESK_DATA_DIR="${APP_DIR}/data"
-ADMIN_PASS=""
-if [[ ! -f "${APP_DIR}/data/users.json" ]] || ! grep -q '"username"' "${APP_DIR}/data/users.json" 2>/dev/null; then
-  ADMIN_PASS="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
-  ORBITDESK_DATA_DIR="${APP_DIR}/data" node "${APP_DIR}/scripts/orbitdesk-user.mjs" create admin "${ADMIN_PASS}"
-  msg "Created login user: admin"
-  msg "Initial password: ${ADMIN_PASS}"
-  msg "Reset later with: orbitdesk-user reset-password admin"
-else
+if [[ -f "${APP_DIR}/data/users.json" ]] && grep -q '"username"' "${APP_DIR}/data/users.json" 2>/dev/null; then
   msg "Existing OrbitDesk users preserved"
+else
+  msg "No users yet — open the app and complete first-start setup"
 fi
 
 cat >/etc/systemd/system/orbitdesk.service <<EOF
@@ -334,9 +381,10 @@ sleep 2
 systemctl --no-pager --full status orbitdesk.service || true
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 msg "Installed — http://${IP:-<ct-ip>}:${APP_PORT}"
+msg "First start: open the URL and create your username / password"
 msg "Config: ${APP_DIR}/.env.local"
+msg "Update: orbitdesk-update   (backs up + auto-rolls back on failure)"
 msg "Users:  orbitdesk-user list | reset-password <user>"
-[[ -z "${ADMIN_PASS}" ]] || msg "Login as admin / ${ADMIN_PASS}"
 CT_INSTALL_EOF
 }
 
@@ -381,6 +429,8 @@ done_msg() {
   echo
   msg_ok "${APP} is ready"
   echo "  URL    : http://${ip:-<ct-ip>}:${ORBITDESK_PORT}"
+  echo "  Setup  : open the URL and create your username / password"
+  echo "  Update : pct enter ${CTID}  then  orbitdesk-update"
   echo "  CT ID  : ${CTID}"
   echo "  Shell  : pct enter ${CTID}"
   echo "  Logs   : pct exec ${CTID} -- journalctl -u orbitdesk -f"

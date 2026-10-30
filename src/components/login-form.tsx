@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Orbit, KeyRound, Terminal } from "lucide-react";
+import { Orbit, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,8 +16,8 @@ export function LoginForm() {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [needsSetup, setNeedsSetup] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     void (async () => {
@@ -28,9 +28,14 @@ export function LoginForm() {
           router.replace(next);
           return;
         }
-        setNeedsSetup(Boolean(body.needsSetup));
+        if (body.needsSetup) {
+          router.replace("/setup");
+          return;
+        }
       } catch {
         /* ignore */
+      } finally {
+        setChecking(false);
       }
     })();
   }, [next, router]);
@@ -47,7 +52,10 @@ export function LoginForm() {
       });
       const body = await res.json();
       if (!res.ok) {
-        setNeedsSetup(Boolean(body.needsSetup));
+        if (body.needsSetup) {
+          router.replace("/setup");
+          return;
+        }
         throw new Error(body.error ?? "Login failed");
       }
       router.replace(next);
@@ -57,6 +65,14 @@ export function LoginForm() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="flex min-h-full flex-1 items-center justify-center text-slate-400">
+        Loading…
+      </div>
+    );
   }
 
   return (
@@ -79,20 +95,6 @@ export function LoginForm() {
             <p className="text-sm text-slate-400">Sign in to the control plane</p>
           </div>
         </div>
-
-        {needsSetup && (
-          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
-            <p className="flex items-start gap-2">
-              <Terminal className="mt-0.5 size-4 shrink-0" />
-              <span>
-                No users yet. On the LXC host shell:
-                <code className="mt-2 block rounded-lg bg-black/40 px-2 py-1 font-mono text-xs text-amber-50">
-                  orbitdesk-user create admin
-                </code>
-              </span>
-            </p>
-          </div>
-        )}
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">

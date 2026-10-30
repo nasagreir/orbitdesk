@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Wrapper so `orbitdesk-update` works from any cwd in the LXC
+set -euo pipefail
+APP_DIR="${ORBITDESK_APP_DIR:-/opt/orbitdesk}"
+if [[ ! -d "${APP_DIR}" ]]; then
+  APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+exec bash "${APP_DIR}/scripts/orbitdesk-update.sh" "$@"

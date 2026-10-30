@@ -18,29 +18,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [username, setUsername] = useState<string | null>(null);
 
-  const isLogin = pathname === "/login";
-
   useEffect(() => {
-    if (isLogin) return;
     void (async () => {
       try {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
         const body = await res.json();
+        if (body.needsSetup) {
+          router.replace("/setup");
+          return;
+        }
         setUsername(body.username ?? null);
       } catch {
         setUsername(null);
       }
     })();
-  }, [isLogin, pathname]);
+  }, [pathname, router]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
-  }
-
-  if (isLogin) {
-    return <>{children}</>;
   }
 
   return (

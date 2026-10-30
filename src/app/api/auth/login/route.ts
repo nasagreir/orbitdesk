@@ -18,8 +18,7 @@ export async function POST(request: Request) {
     if (count === 0) {
       return NextResponse.json(
         {
-          error:
-            "No users configured. Create one in the LXC: orbitdesk-user create admin",
+          error: "No users configured yet. Complete first-start setup.",
           needsSetup: true,
         },
         { status: 403 },
