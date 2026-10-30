@@ -27,6 +27,8 @@ export interface StarlinkDevice {
   /** Mini roam / travel mode */
   roamEnabled?: boolean;
   roamNote?: string;
+  /** True when travel/roam mode has paused offline/down alarming */
+  alarmsPaused?: boolean;
 }
 
 export interface ThroughputPoint {

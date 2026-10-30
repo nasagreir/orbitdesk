@@ -14,19 +14,61 @@ import type {
   ThroughputPoint,
 } from "@/lib/types";
 
+const DOWN_ALERT =
+  /offline|unreachable|not connected|no connectivity|dish down|dish offline|link down/i;
+
+/**
+ * Travel / roam mode: keep health telemetry accurate, but pause alarming
+ * that the dish is down (expected while packed or in transit).
+ */
+export function applyTravelModeAlarms(
+  device: StarlinkDevice,
+): StarlinkDevice {
+  const roamEnabled = Boolean(device.roamEnabled);
+  let alerts = device.alerts.filter(
+    (alert) => !alert.startsWith("Travel mode —"),
+  );
+
+  if (roamEnabled) {
+    alerts = alerts.filter((alert) => !DOWN_ALERT.test(alert));
+    return {
+      ...device,
+      roamEnabled: true,
+      alerts,
+      alarmsPaused: true,
+    };
+  }
+
+  if (
+    device.health === "offline" &&
+    !alerts.some((alert) => DOWN_ALERT.test(alert))
+  ) {
+    alerts = [...alerts, "Dish offline / unreachable"];
+  }
+
+  return {
+    ...device,
+    roamEnabled: false,
+    alerts,
+    alarmsPaused: false,
+  };
+}
+
 async function applyDevicePrefs(
   devices: StarlinkDevice[],
 ): Promise<StarlinkDevice[]> {
   const prefs = await getAllDevicePrefs();
   return devices.map((device) => {
     const p = prefs[device.id];
-    if (!p) return device;
-    return {
-      ...device,
-      modelId: p.modelId ?? device.modelId,
-      roamEnabled: p.roamEnabled ?? device.roamEnabled,
-      roamNote: p.roamNote ?? device.roamNote,
-    };
+    const withPrefs = p
+      ? {
+          ...device,
+          modelId: p.modelId ?? device.modelId,
+          roamEnabled: p.roamEnabled ?? device.roamEnabled,
+          roamNote: p.roamNote ?? device.roamNote,
+        }
+      : device;
+    return applyTravelModeAlarms(withPrefs);
   });
 }
 

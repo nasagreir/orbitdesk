@@ -5,8 +5,8 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 ## Features
 
 - Fleet overview for one or more Starlink dishes (throughput, latency, obstruction, uptime)
-- Assign standard model images (Mini, Gen 2/3, High Performance, Flat HP) per dish
-- Mini **Roam** mode for travel — trip notes + roaming badge
+- Product photos for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
+- Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
 - Username/password login with LXC CLI password recovery

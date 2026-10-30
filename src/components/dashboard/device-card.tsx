@@ -34,6 +34,10 @@ const healthStyles = {
   unknown: "border-slate-400/40 bg-slate-400/10 text-slate-300",
 };
 
+/** Softer offline styling while travel mode has paused down-alarms */
+const offlinePausedStyle =
+  "border-slate-400/35 bg-slate-400/10 text-slate-300";
+
 export function DeviceCard({
   device,
   selected,
@@ -52,6 +56,8 @@ export function DeviceCard({
   const [roamNote, setRoamNote] = useState(device.roamNote ?? "");
   const model = getStarlinkModel(device.modelId);
   const canRoam = Boolean(model?.supportsRoam);
+  const alarmsPaused = Boolean(device.alarmsPaused && device.roamEnabled);
+  const offlineAlarmsPaused = alarmsPaused && device.health === "offline";
 
   async function runAction(action: StarlinkAction) {
     setPending(action);
@@ -189,9 +195,13 @@ export function DeviceCard({
                 <h3 className="font-heading text-lg text-white">{device.name}</h3>
                 <Badge
                   variant="outline"
-                  className={healthStyles[device.health]}
+                  className={
+                    offlineAlarmsPaused
+                      ? offlinePausedStyle
+                      : healthStyles[device.health]
+                  }
                 >
-                  {device.health}
+                  {offlineAlarmsPaused ? "offline · paused" : device.health}
                 </Badge>
                 {model && (
                   <Badge
@@ -207,7 +217,7 @@ export function DeviceCard({
                     className="border-violet-400/40 bg-violet-400/10 text-violet-200"
                   >
                     <MapPinned className="mr-1 size-3" />
-                    Roaming
+                    Travel mode
                   </Badge>
                 )}
               </div>
@@ -221,7 +231,9 @@ export function DeviceCard({
                   ? "text-cyan-300"
                   : device.health === "degraded"
                     ? "text-amber-300"
-                    : "text-slate-500"
+                    : offlineAlarmsPaused
+                      ? "text-slate-600"
+                      : "text-slate-500"
               }`}
             />
           </button>
@@ -273,9 +285,10 @@ export function DeviceCard({
         <div className="mt-4 rounded-xl border border-violet-400/20 bg-violet-400/5 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-medium text-violet-100">Mini Roam</p>
+              <p className="text-sm font-medium text-violet-100">Travel mode</p>
               <p className="text-xs text-slate-400">
-                Travel mode for Starlink Mini — use when you take it on the road
+                Mini roam — pauses offline / down alarms while the dish is packed
+                or in transit
               </p>
             </div>
             <Button
@@ -316,6 +329,17 @@ export function DeviceCard({
               </Button>
             </div>
           )}
+        </div>
+      )}
+
+      {alarmsPaused && (
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-violet-400/20 bg-violet-400/5 px-3 py-2 text-xs text-violet-100">
+          <MapPinned className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Travel mode active
+            {device.roamNote ? ` — ${device.roamNote}` : ""}. Offline / down
+            alarming is paused until roam ends.
+          </span>
         </div>
       )}
 

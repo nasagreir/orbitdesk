@@ -28,6 +28,8 @@ export function buildStarlinkSystemPrompt(devices: StarlinkDevice[]): string {
     obstructionPct: d.obstructionPct,
     uptimeSeconds: d.uptimeSeconds,
     alerts: d.alerts,
+    roamEnabled: Boolean(d.roamEnabled),
+    alarmsPaused: Boolean(d.alarmsPaused),
   }));
 
   return [
@@ -35,6 +37,7 @@ export function buildStarlinkSystemPrompt(devices: StarlinkDevice[]): string {
     "Help the operator interpret dish telemetry, Home Assistant entities, and recovery steps.",
     "Be concise, practical, and specific to the live snapshot when available.",
     "Prefer actionable advice (clear obstructions, reboot via HA, check power/roaming) over generic networking tips.",
+    "If alarmsPaused or roamEnabled is true, the dish is in travel/roam mode — do not treat offline as an incident and do not recommend reboot for being down.",
     "Current dish snapshot (JSON):",
     JSON.stringify(snapshot, null, 2),
   ].join("\n");
@@ -88,7 +91,10 @@ export function demoGrokReply(
   prompt: string,
   devices: StarlinkDevice[],
 ): string {
-  const degraded = devices.filter((d) => d.health !== "online");
+  const degraded = devices.filter(
+    (d) => d.health !== "online" && !d.alarmsPaused,
+  );
+  const traveling = devices.filter((d) => d.alarmsPaused);
   const worst = [...devices].sort(
     (a, b) => b.obstructionPct - a.obstructionPct,
   )[0];
@@ -100,7 +106,12 @@ export function demoGrokReply(
       degraded.length
         ? `Candidates: ${degraded.map((d) => d.name).join(", ")}.`
         : "All dishes look online right now.",
-    ].join(" ");
+      traveling.length
+        ? `Skipping travel-mode units (alarms paused): ${traveling.map((d) => d.name).join(", ")}.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (/obstruct|tree|signal/i.test(prompt) && worst) {
@@ -119,6 +130,11 @@ export function demoGrokReply(
     degraded.length
       ? `${degraded.length} need attention: ${degraded.map((d) => `${d.name} (${d.health})`).join("; ")}.`
       : "Fleet is healthy.",
+    traveling.length
+      ? `${traveling.length} in travel mode with down-alarms paused.`
+      : "",
     "Ask about reboot steps, obstruction, or latency and I’ll use the live telemetry once Grok is connected.",
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

@@ -21,6 +21,7 @@ export function FleetOverview() {
 
   const totals = useMemo(() => {
     const online = devices.filter((d) => d.health === "online").length;
+    // Down/offline alerts are already stripped for travel-mode dishes server-side
     const alerts = devices.reduce((sum, d) => sum + d.alerts.length, 0);
     const down = devices.reduce((sum, d) => sum + d.downlinkMbps, 0);
     const withLatency = devices.filter((d) => d.latencyMs > 0);
