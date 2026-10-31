@@ -1,5 +1,11 @@
 import { getGrokConfig } from "@/lib/config";
-import type { GrokMessage, StarlinkDevice } from "@/lib/types";
+import { buildDemoInsights } from "@/lib/history";
+import type {
+  GrokMessage,
+  HistoryInsight,
+  HistoryPayload,
+  StarlinkDevice,
+} from "@/lib/types";
 
 export async function checkGrok(): Promise<{
   reachable: boolean;
@@ -137,4 +143,116 @@ export function demoGrokReply(
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function buildHistoryInsightsPrompt(history: HistoryPayload): string {
+  const compact = {
+    range: history.range,
+    summary: history.summary,
+    seriesTail: history.series.slice(-12),
+    devices: history.devices,
+  };
+
+  return [
+    "You are Grok embedded in OrbitDesk, a Starlink ops dashboard.",
+    "Given fleet historical telemetry, return 2–4 concrete improvement suggestions.",
+    "Focus on obstruction clearing, mount/aim, power, roam/travel context, Ethernet vs Wi‑Fi, and when to reboot via Home Assistant.",
+    "Do not invent dishes that are not in the payload. Prefer the worst metrics first.",
+    "Respond with ONLY a JSON array (no markdown fences) of objects with keys:",
+    'id (string slug), title (short), detail (1–2 sentences), priority ("high"|"medium"|"low"),',
+    "deviceId (optional dish id from payload), metric (optional: obstruction|latency|throughput|uptime|general).",
+    "History payload:",
+    JSON.stringify(compact),
+  ].join("\n");
+}
+
+function parseInsightArray(raw: string): HistoryInsight[] | null {
+  const trimmed = raw.trim();
+  const start = trimmed.indexOf("[");
+  const end = trimmed.lastIndexOf("]");
+  if (start < 0 || end <= start) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as unknown;
+    if (!Array.isArray(parsed)) return null;
+
+    const insights: HistoryInsight[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const title = typeof row.title === "string" ? row.title.trim() : "";
+      const detail = typeof row.detail === "string" ? row.detail.trim() : "";
+      if (!title || !detail) continue;
+      const priority =
+        row.priority === "high" || row.priority === "medium" || row.priority === "low"
+          ? row.priority
+          : "medium";
+      insights.push({
+        id:
+          typeof row.id === "string" && row.id.trim()
+            ? row.id.trim()
+            : `insight-${insights.length + 1}`,
+        title,
+        detail,
+        priority,
+        deviceId:
+          typeof row.deviceId === "string" ? row.deviceId : undefined,
+        metric: typeof row.metric === "string" ? row.metric : undefined,
+      });
+    }
+    return insights.length > 0 ? insights.slice(0, 4) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Ask Grok for improvement suggestions from history; falls back to heuristics. */
+export async function suggestHistoryImprovements(
+  history: HistoryPayload,
+): Promise<{ insights: HistoryInsight[]; demo: boolean }> {
+  const { apiKey, model, baseUrl, configured } = getGrokConfig();
+
+  if (!configured) {
+    return { insights: buildDemoInsights(history), demo: true };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: buildHistoryInsightsPrompt(history) },
+          {
+            role: "user",
+            content:
+              "Analyze this historical window and return the JSON improvement array now.",
+          },
+        ],
+        temperature: 0.35,
+        stream: false,
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      throw new Error(`Grok API error ${res.status}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const parsed = parseInsightArray(content);
+    if (parsed) {
+      return { insights: parsed, demo: false };
+    }
+    return { insights: buildDemoInsights(history), demo: true };
+  } catch {
+    return { insights: buildDemoInsights(history), demo: true };
+  }
 }

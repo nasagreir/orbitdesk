@@ -72,3 +72,91 @@ export interface SettingsPublic {
   pollIntervalSeconds: number;
   demoModeForced: boolean;
 }
+
+export type HistoryRange = "24h" | "7d" | "14d";
+
+export interface HistoryDeviceSample {
+  name: string;
+  health: DeviceHealth;
+  downlinkMbps: number;
+  uplinkMbps: number;
+  latencyMs: number;
+  obstructionPct: number;
+  alertCount: number;
+}
+
+export interface HistoryPoint {
+  at: string;
+  deviceCount: number;
+  onlineCount: number;
+  avgDownlinkMbps: number;
+  avgUplinkMbps: number;
+  avgLatencyMs: number;
+  avgObstructionPct: number;
+  alertCount: number;
+  degradedCount: number;
+  offlineCount: number;
+  byDevice: Record<string, HistoryDeviceSample>;
+}
+
+export interface HistorySummary {
+  sampleCount: number;
+  avgDownlinkMbps: number;
+  peakDownlinkMbps: number;
+  bestDownlinkMbps: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  avgObstructionPct: number;
+  peakObstructionPct: number;
+  totalAlertSamples: number;
+  uptimePct: number;
+  worstDayLabel: string | null;
+}
+
+export interface HistorySeriesPoint {
+  label: string;
+  at: string;
+  downlinkMbps: number;
+  uplinkMbps: number;
+  latencyMs: number;
+  obstructionPct: number;
+  alertCount: number;
+  onlinePct: number;
+}
+
+export interface HistoryDeviceStats {
+  id: string;
+  name: string;
+  avgDownlinkMbps: number;
+  avgLatencyMs: number;
+  avgObstructionPct: number;
+  peakObstructionPct: number;
+  uptimePct: number;
+  alertSamples: number;
+}
+
+export interface HistoryPayload {
+  range: HistoryRange;
+  fetchedAt: string;
+  summary: HistorySummary;
+  series: HistorySeriesPoint[];
+  devices: HistoryDeviceStats[];
+}
+
+export type HistoryInsightPriority = "high" | "medium" | "low";
+
+export interface HistoryInsight {
+  id: string;
+  title: string;
+  detail: string;
+  priority: HistoryInsightPriority;
+  deviceId?: string;
+  metric?: string;
+}
+
+export interface HistoryInsightsPayload {
+  range: HistoryRange;
+  demo: boolean;
+  insights: HistoryInsight[];
+  fetchedAt: string;
+}

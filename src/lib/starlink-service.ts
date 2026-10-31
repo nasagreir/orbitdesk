@@ -2,6 +2,10 @@ import { getAppConfig, getGrokConfig, getHomeAssistantConfig } from "@/lib/confi
 import { getAllDevicePrefs } from "@/lib/device-prefs";
 import { checkGrok } from "@/lib/grok";
 import {
+  ensureSeedHistory,
+  recordHistorySnapshot,
+} from "@/lib/history";
+import {
   callStarlinkService,
   checkHomeAssistant,
   fetchStarlinkDevicesFromHa,
@@ -13,6 +17,15 @@ import type {
   StarlinkDevice,
   ThroughputPoint,
 } from "@/lib/types";
+
+async function persistHistory(devices: StarlinkDevice[]) {
+  try {
+    await ensureSeedHistory(devices);
+    await recordHistorySnapshot(devices);
+  } catch {
+    // History is best-effort — never block the live dashboard
+  }
+}
 
 const DOWN_ALERT =
   /offline|unreachable|not connected|no connectivity|dish down|dish offline|link down/i;
@@ -109,6 +122,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
       };
     }
     demo.devices = await applyDevicePrefs(demo.devices);
+    await persistHistory(demo.devices);
     return demo;
   }
 
@@ -130,12 +144,14 @@ export async function getDashboard(): Promise<DashboardPayload> {
       },
     };
     demo.devices = await applyDevicePrefs(demo.devices);
+    await persistHistory(demo.devices);
     return demo;
   }
 
   try {
     const devices = await applyDevicePrefs(await fetchStarlinkDevicesFromHa());
     const primary = devices.find((d) => d.health === "online") ?? devices[0];
+    await persistHistory(devices);
     return {
       status: {
         mode: "live",
@@ -178,6 +194,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
       },
     };
     demo.devices = await applyDevicePrefs(demo.devices);
+    await persistHistory(demo.devices);
     return demo;
   }
 }
