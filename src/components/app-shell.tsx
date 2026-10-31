@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, Orbit, Settings2, Satellite } from "lucide-react";
+import { History, LogOut, Orbit, Settings2, Satellite } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Fleet", icon: Satellite },
+  { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Connections", icon: Settings2 },
 ];
 

@@ -58,16 +58,16 @@ export function HistorySection() {
     useHistory(range);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm uppercase tracking-[0.18em] text-cyan-300/70">
+          <p className="text-sm uppercase tracking-[0.2em] text-cyan-300/80">
             Trends
           </p>
-          <h2 className="mt-1 font-heading text-2xl text-white">
-            Historical data
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
+          <h1 className="mt-1 font-heading text-3xl tracking-tight text-white sm:text-4xl">
+            History
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400 sm:text-base">
             Fleet throughput, latency, and obstruction over time — with Grok
             suggestions grounded in this window.
           </p>

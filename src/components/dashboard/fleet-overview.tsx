@@ -5,7 +5,6 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceCard } from "@/components/dashboard/device-card";
 import { GrokAssistant } from "@/components/dashboard/grok-assistant";
-import { HistorySection } from "@/components/dashboard/history-section";
 import { StatusBanner } from "@/components/dashboard/status-banner";
 import { ThroughputChart } from "@/components/dashboard/throughput-chart";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -127,8 +126,6 @@ export function FleetOverview() {
           grokConfigured={data.status.grok.configured}
         />
       </div>
-
-      <HistorySection />
     </div>
   );
 }

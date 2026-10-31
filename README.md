@@ -5,7 +5,7 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 ## Features
 
 - Fleet overview for one or more Starlink dishes (throughput, latency, obstruction, uptime)
-- Historical data section (24h / 7d / 14d) with fleet charts, per-dish stats, and Grok-suggested improvements
+- History tab (24h / 7d / 14d) with fleet charts, per-dish stats, and Grok-suggested improvements
 - Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
 - Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
 - Device actions: reboot / stow / unstow via Home Assistant button entities
