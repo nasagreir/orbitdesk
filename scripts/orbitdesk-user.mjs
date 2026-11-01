@@ -61,6 +61,7 @@ async function writeUsers(data) {
   } catch {
     /* ignore */
   }
+  await ownDataForAppUser();
 }
 
 async function promptHidden(label) {
@@ -86,14 +87,51 @@ function usage() {
 
 Usage:
   orbitdesk-user list
-  orbitdesk-user create <username> [password]
-  orbitdesk-user reset-password <username> [password]
+  orbitdesk-user create USERNAME [password]
+  orbitdesk-user reset-password USERNAME [password]
   orbitdesk-user path
 
-Password recovery (LXC):
-  pct enter <CTID>
-  orbitdesk-user reset-password admin
+Do not type angle brackets. Those are shell redirection, not part of the name.
+
+Examples:
+  orbitdesk-user list
+  orbitdesk-user create ghull
+  orbitdesk-user reset-password ghull
 `);
+}
+
+function normalizeUsername(raw) {
+  if (raw == null || raw === "") return "";
+  const trimmed = String(raw).trim();
+  if (trimmed.includes("<") || trimmed.includes(">")) {
+    const inner = trimmed.replace(/[<>]/g, "");
+    console.error(
+      "Do not include angle brackets. The shell treats <name> as a redirect.",
+    );
+    console.error(
+      `Example: orbitdesk-user reset-password ${inner || "ghull"}`,
+    );
+    if (/^[a-zA-Z0-9._-]{3,32}$/.test(inner)) {
+      console.error(`Continuing with username "${inner}".`);
+      return inner;
+    }
+    process.exit(1);
+  }
+  return trimmed;
+}
+
+async function ownDataForAppUser() {
+  if (typeof process.getuid === "function" && process.getuid() !== 0) return;
+  const appUser = process.env.ORBITDESK_APP_USER || "orbitdesk";
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execFileAsync = promisify(execFile);
+  try {
+    await execFileAsync("id", [appUser]);
+    await execFileAsync("chown", ["-R", `${appUser}:${appUser}`, DATA_DIR]);
+  } catch {
+    /* app user may not exist in local dev */
+  }
 }
 
 async function cmdList() {
@@ -108,6 +146,7 @@ async function cmdList() {
 }
 
 async function cmdCreate(username, passwordArg) {
+  username = normalizeUsername(username);
   if (!username) {
     usage();
     process.exit(1);
@@ -149,6 +188,7 @@ async function cmdCreate(username, passwordArg) {
 }
 
 async function cmdReset(username, passwordArg) {
+  username = normalizeUsername(username);
   if (!username) {
     usage();
     process.exit(1);

@@ -138,9 +138,10 @@ export function LoginForm() {
         </form>
 
         <p className="mt-5 text-xs leading-relaxed text-slate-500">
-          Forgot password? Recover from the LXC CLI:
+          Forgot password? On the LXC, type the username with no angle
+          brackets:
           <code className="mt-1 block rounded-lg bg-black/30 px-2 py-1 font-mono text-[11px] text-slate-300">
-            orbitdesk-user reset-password &lt;username&gt;
+            orbitdesk-user reset-password ghull
           </code>
         </p>
       </div>

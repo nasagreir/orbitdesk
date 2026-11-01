@@ -53,11 +53,38 @@ export async function verifySessionToken(
   }
 }
 
-export function sessionCookieOptions(maxAgeSeconds = 60 * 60 * 24 * 7) {
+/**
+ * Secure cookies are ignored by browsers on http:// (typical LXC LAN install).
+ * Only set Secure when the request is actually HTTPS, or AUTH_COOKIE_SECURE=true.
+ */
+export function sessionCookieOptions(
+  request?: Request,
+  maxAgeSeconds = 60 * 60 * 24 * 7,
+) {
+  const explicit = (process.env.AUTH_COOKIE_SECURE ?? "").toLowerCase();
+  let secure = false;
+  if (explicit === "1" || explicit === "true") {
+    secure = true;
+  } else if (explicit === "0" || explicit === "false") {
+    secure = false;
+  } else if (request) {
+    const forwarded = request.headers.get("x-forwarded-proto");
+    const proto = forwarded?.split(",")[0]?.trim();
+    if (proto === "https") secure = true;
+    else if (proto === "http") secure = false;
+    else {
+      try {
+        secure = new URL(request.url).protocol === "https:";
+      } catch {
+        secure = false;
+      }
+    }
+  }
+
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure,
     path: "/",
     maxAge: maxAgeSeconds,
   };

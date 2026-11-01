@@ -684,7 +684,7 @@ msg "Installed — http://${IP:-<ct-ip>}:${APP_PORT}"
 msg "First start: open the URL and create your username / password"
 msg "Config: ${APP_DIR}/.env.local"
 msg "Update: orbitdesk-update   (backs up + auto-rolls back on failure)"
-msg "Users:  orbitdesk-user list | reset-password <user>"
+msg "Users:  orbitdesk-user list | reset-password USERNAME"
 CT_INSTALL_EOF
 }
 

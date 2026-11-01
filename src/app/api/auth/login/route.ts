@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       ok: true,
       username: user.username,
     });
-    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(request));
     return response;
   } catch (error) {
     return NextResponse.json(

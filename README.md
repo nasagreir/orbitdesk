@@ -49,11 +49,13 @@ The updater snapshots the live install under `/var/backups/orbitdesk/` and `/opt
 ### Password recovery (LXC CLI)
 
 ```bash
-pct enter <CTID>
-orbitdesk-user reset-password admin
-# or: orbitdesk-user create alice
-# or: orbitdesk-user list
+pct enter CTID
+orbitdesk-user list
+orbitdesk-user reset-password ghull
+# or: orbitdesk-user create ghull
 ```
+
+Type the username by itself. `<ghull>` is shell redirection and will fail with `syntax error near unexpected token`.
 
 ## Quick start (local)
 
