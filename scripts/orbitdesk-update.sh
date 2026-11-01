@@ -6,8 +6,12 @@
 #   orbitdesk-update
 #   orbitdesk-update --branch main
 #   ORBITDESK_REPO=https://github.com/nasagreir/orbitdesk.git orbitdesk-update
+#
+# Default source: https://github.com/nasagreir/orbitdesk
 # =============================================================================
 set -euo pipefail
+
+ORBITDESK_GITHUB_URL="https://github.com/nasagreir/orbitdesk.git"
 
 APP_DIR="${ORBITDESK_APP_DIR:-/opt/orbitdesk}"
 APP_USER="${ORBITDESK_APP_USER:-orbitdesk}"
@@ -125,7 +129,7 @@ resolve_repo() {
   if [[ -d "${APP_DIR}/.git" ]]; then
     REPO_URL="$(git -C "${APP_DIR}" remote get-url origin 2>/dev/null || true)"
   fi
-  REPO_URL="${REPO_URL:-https://github.com/nasagreir/orbitdesk.git}"
+  REPO_URL="${REPO_URL:-${ORBITDESK_GITHUB_URL}}"
 }
 
 create_backup() {

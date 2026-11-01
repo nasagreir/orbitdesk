@@ -2,6 +2,8 @@
 # =============================================================================
 # OrbitDesk — single pasteable Proxmox LXC installer
 # =============================================================================
+# Repo: https://github.com/nasagreir/orbitdesk
+#
 # Paste this entire file into a Proxmox VE host shell (as root), OR run:
 #
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
@@ -9,8 +11,12 @@
 # =============================================================================
 set -euo pipefail
 
+# Canonical public GitHub repo (override with ORBITDESK_REPO=... if needed)
+ORBITDESK_GITHUB_URL="https://github.com/nasagreir/orbitdesk.git"
+ORBITDESK_GITHUB_RAW="https://raw.githubusercontent.com/nasagreir/orbitdesk"
+
 # --------------- edit these if you want non-interactive defaults -------------
-ORBITDESK_REPO="${ORBITDESK_REPO:-https://github.com/nasagreir/orbitdesk.git}"
+ORBITDESK_REPO="${ORBITDESK_REPO:-${ORBITDESK_GITHUB_URL}}"
 ORBITDESK_BRANCH="${ORBITDESK_BRANCH:-main}"
 ORBITDESK_PORT="${ORBITDESK_PORT:-3456}"
 ORBITDESK_CTID="${ORBITDESK_CTID:-}"
@@ -138,11 +144,11 @@ gather() {
     SOURCE_MODE="local"
   else
     SOURCE_MODE="git"
-    if [[ -z "${ORBITDESK_REPO}" ]]; then
-      echo
-      msg_warn "Set the Git URL the container can clone (public HTTPS or deploy-key/SSH)."
-      prompt ORBITDESK_REPO "OrbitDesk git URL" ""
-    fi
+    ORBITDESK_REPO="${ORBITDESK_REPO:-${ORBITDESK_GITHUB_URL}}"
+    echo
+    msg_info "Source: ${ORBITDESK_REPO} (branch ${ORBITDESK_BRANCH})"
+    msg_info "One-liner: bash -c \"\$(curl -fsSL ${ORBITDESK_GITHUB_RAW}/main/proxmox-install.sh)\""
+    prompt ORBITDESK_REPO "OrbitDesk git URL" "${ORBITDESK_REPO}"
     [[ -n "${ORBITDESK_REPO}" ]] || msg_error "ORBITDESK_REPO is required when not run from a local clone."
     prompt ORBITDESK_BRANCH "Git branch" "${ORBITDESK_BRANCH}"
   fi

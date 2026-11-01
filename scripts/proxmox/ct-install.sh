@@ -6,7 +6,7 @@ APP_DIR="/opt/orbitdesk"
 APP_USER="orbitdesk"
 APP_PORT="${ORBITDESK_PORT:-3456}"
 NODE_MAJOR="${ORBITDESK_NODE_MAJOR:-22}"
-REPO_URL="${ORBITDESK_REPO:-}"
+REPO_URL="${ORBITDESK_REPO:-https://github.com/nasagreir/orbitdesk.git}"
 REPO_BRANCH="${ORBITDESK_BRANCH:-main}"
 SOURCE_ARCHIVE="${ORBITDESK_SOURCE_ARCHIVE:-/tmp/orbitdesk-src.tar.gz}"
 
