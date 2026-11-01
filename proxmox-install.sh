@@ -123,27 +123,36 @@ confirm_yn() {
   [[ "${a:-$d}" =~ ^[Yy]$ ]]
 }
 
-# True if VM/CT id is used anywhere in the cluster (not just this node)
+# True if VM/CT id is used anywhere in the cluster (not just this node).
+# Ground truth is /etc/pve/nodes/<node>/{qemu-server,lxc}/<id>.conf — qm/pct
+# status on this node cannot see a guest that lives on another node.
 id_in_use() {
-  local id="$1"
+  local id="$1" conf node
 
-  # Shared cluster config (covers guests on other nodes like 'pve')
-  if [[ -f /etc/pve/.vmlist ]]; then
-    if command -v jq >/dev/null 2>&1; then
-      jq -e --arg id "${id}" '.ids[$id] != null' /etc/pve/.vmlist >/dev/null 2>&1 && return 0
-    elif grep -Eq "\"${id}\"[[:space:]]*:" /etc/pve/.vmlist 2>/dev/null; then
-      return 0
-    fi
+  [[ "${id}" =~ ^[0-9]+$ ]] || return 1
+
+  shopt -s nullglob
+  local -a confs=(
+    /etc/pve/nodes/*/qemu-server/"${id}".conf
+    /etc/pve/nodes/*/lxc/"${id}".conf
+  )
+  shopt -u nullglob
+  if (( ${#confs[@]} > 0 )); then
+    return 0
   fi
 
-  # Local guests
-  pct status "${id}" &>/dev/null && return 0
-  qm status "${id}" &>/dev/null && return 0
+  if [[ -f /etc/pve/.vmlist ]] && grep -Eq "\"${id}\"[[:space:]]*:" /etc/pve/.vmlist 2>/dev/null; then
+    return 0
+  fi
 
-  # Cluster resources API
+  pct config "${id}" &>/dev/null && return 0
+  qm config "${id}" &>/dev/null && return 0
+
   if command -v pvesh >/dev/null 2>&1; then
     if pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
-      | grep -Eq "\"vmid\"[[:space:]]*:[[:space:]]*${id}([,}]|$)"; then
+      | grep -Eq "\"(vmid|id)\"[[:space:]]*:[[:space:]]*\"?(qemu|lxc)/?${id}\"?([,}]|$)" \
+      || pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+        | grep -Eq "\"vmid\"[[:space:]]*:[[:space:]]*${id}([,}]|$)"; then
       return 0
     fi
   fi
@@ -152,35 +161,47 @@ id_in_use() {
 }
 
 id_location_hint() {
-  local id="$1" hint=""
-  if [[ -f /etc/pve/.vmlist ]] && command -v jq >/dev/null 2>&1; then
-    hint="$(jq -r --arg id "${id}" '.ids[$id] | "\(.type // "?") on \(.node // "?")"' /etc/pve/.vmlist 2>/dev/null || true)"
-    [[ "${hint}" == *"null"* ]] && hint=""
-  fi
-  echo "${hint}"
+  local id="$1" conf node="" kind=""
+  shopt -s nullglob
+  for conf in /etc/pve/nodes/*/qemu-server/"${id}".conf /etc/pve/nodes/*/lxc/"${id}".conf; do
+    node="$(basename "$(dirname "$(dirname "${conf}")")")"
+    [[ "${conf}" == *qemu-server* ]] && kind="VM" || kind="CT"
+    echo "${kind} on ${node}"
+    shopt -u nullglob
+    return
+  done
+  shopt -u nullglob
+  echo ""
 }
 
-next_ctid() {
-  local id nid
-
-  # Official cluster-wide free ID
-  if command -v pvesh >/dev/null 2>&1; then
-    nid="$(pvesh get /cluster/nextid 2>/dev/null || true)"
-    if [[ "${nid}" =~ ^[0-9]+$ ]] && ! id_in_use "${nid}"; then
-      echo "${nid}"
-      return
-    fi
-  fi
-
-  id=100
+# Smallest free ID strictly greater than $1 (or >= 100 when called as next_ctid).
+next_free_after() {
+  local id="$1"
   while id_in_use "${id}"; do
     id=$((id + 1))
-    # Stay in typical CT range; wrap upward only
     if (( id > 999999 )); then
       msg_error "Could not find a free CT/VM ID."
     fi
   done
-  echo "${id}"
+  printf '%s\n' "${id}"
+}
+
+next_ctid() {
+  local nid=""
+
+  # Official cluster-wide free ID. Output is sometimes "101", sometimes a JSON scalar.
+  if command -v pvesh >/dev/null 2>&1; then
+    nid="$(pvesh get /cluster/nextid --output-format json 2>/dev/null | tr -cd '0-9' || true)"
+    if [[ -z "${nid}" ]]; then
+      nid="$(pvesh get /cluster/nextid 2>/dev/null | tr -cd '0-9' || true)"
+    fi
+    if [[ "${nid}" =~ ^[0-9]+$ ]] && ! id_in_use "${nid}"; then
+      printf '%s\n' "${nid}"
+      return
+    fi
+  fi
+
+  next_free_after 100
 }
 
 ensure_free_ctid() {
@@ -333,7 +354,7 @@ resolve_local() {
 gather() {
   header
   echo
-  msg_info "Creates a Debian 12 LXC and installs ${APP} on port ${ORBITDESK_PORT}."
+  msg_info "OrbitDesk installer (cluster-safe IDs). Creates a Debian 12 LXC on port ${ORBITDESK_PORT}."
   if [[ "${AUTO_YES}" -eq 1 ]]; then
     msg_ok "Automatic mode — using detected defaults (pass flags interactively by running without --yes)."
   fi
@@ -407,45 +428,64 @@ gather() {
 }
 
 create_ct() {
-  local template password=""
+  local template password="" attempt id create_log
   template="$(pick_template "${TEMPLATE_STORAGE}")"
-  msg_info "Creating CT ${CTID} (template ${template} → rootfs ${STORAGE}:${DISK})"
-
-  local -a args=(
-    create "${CTID}" "${template}"
-    --hostname "${HN}"
-    --cores "${CORES}"
-    --memory "${MEMORY}"
-    --swap 512
-    --rootfs "${STORAGE}:${DISK}"
-    --net0 "name=eth0,bridge=${BRIDGE},ip=dhcp"
-    --unprivileged "${ORBITDESK_UNPRIVILEGED}"
-    --features nesting=1
-    --onboot 1
-    --ostype debian
-    --start 0
-  )
-  if [[ -f /root/.ssh/authorized_keys ]]; then
-    args+=(--ssh-public-keys /root/.ssh/authorized_keys)
-  else
+  password=""
+  if [[ ! -f /root/.ssh/authorized_keys ]]; then
     password="$(openssl rand -base64 18)"
-    args+=(--password "${password}")
   fi
 
-  local create_log
-  create_log="$(mktemp)"
-  if ! pct "${args[@]}" >"${create_log}" 2>&1; then
-    cat "${create_log}" >&2 || true
-    if grep -qiE 'already exists|unique' "${create_log}" 2>/dev/null; then
+  id="${CTID}"
+  for attempt in $(seq 1 40); do
+    if id_in_use "${id}"; then
+      msg_warn "ID ${id} already used ($(id_location_hint "${id}")) — skipping"
+      id="$(next_free_after $((id + 1)))"
+      continue
+    fi
+
+    msg_info "Creating CT ${id} (template ${template} → rootfs ${STORAGE}:${DISK})"
+
+    local -a args=(
+      create "${id}" "${template}"
+      --hostname "${HN}"
+      --cores "${CORES}"
+      --memory "${MEMORY}"
+      --swap 512
+      --rootfs "${STORAGE}:${DISK}"
+      --net0 "name=eth0,bridge=${BRIDGE},ip=dhcp"
+      --unprivileged "${ORBITDESK_UNPRIVILEGED}"
+      --features nesting=1
+      --onboot 1
+      --ostype debian
+      --start 0
+    )
+    if [[ -f /root/.ssh/authorized_keys ]]; then
+      args+=(--ssh-public-keys /root/.ssh/authorized_keys)
+    else
+      args+=(--password "${password}")
+    fi
+
+    create_log="$(mktemp)"
+    if pct "${args[@]}" >"${create_log}" 2>&1; then
       rm -f "${create_log}"
-      msg_error "CT/VM ID ${CTID} is already taken in this cluster. Re-run with --yes (auto-picks a free ID) or ORBITDESK_CTID=$(next_ctid)."
+      CTID="${id}"
+      msg_ok "CT ${CTID} created"
+      [[ -z "${password}" ]] || msg_warn "CT root password: ${password}"
+      return 0
+    fi
+
+    cat "${create_log}" >&2 || true
+    if grep -qiE 'already exists|unique|already used' "${create_log}" 2>/dev/null; then
+      rm -f "${create_log}"
+      msg_warn "Cluster rejected ID ${id} (already exists on another node) — trying the next free ID"
+      id="$(next_free_after $((id + 1)))"
+      continue
     fi
     rm -f "${create_log}"
     msg_error "pct create failed. Template storage must support vztmpl; rootfs storage must support rootdir."
-  fi
-  rm -f "${create_log}"
-  msg_ok "CT ${CTID} created"
-  [[ -z "${password}" ]] || msg_warn "CT root password: ${password}"
+  done
+
+  msg_error "Could not find a free CT ID after ${attempt} attempts."
 }
 
 start_ct() {
