@@ -3,9 +3,10 @@
 # OrbitDesk updater — backup first, deploy, health-check, auto-rollback on fail
 # =============================================================================
 # Usage (inside the LXC as root):
-#   orbitdesk-update
-#   orbitdesk-update --branch main
-#   ORBITDESK_REPO=https://github.com/nasagreir/orbitdesk.git orbitdesk-update
+#   update
+#   update --branch main
+#   ORBITDESK_REPO=https://github.com/nasagreir/orbitdesk.git update
+#   orbitdesk-update   # same command, kept as an alias
 #
 # Default source: https://github.com/nasagreir/orbitdesk
 # =============================================================================
@@ -25,10 +26,10 @@ HEALTH_RETRIES="${ORBITDESK_HEALTH_RETRIES:-20}"
 HEALTH_SLEEP="${ORBITDESK_HEALTH_SLEEP:-3}"
 
 BL=$'\033[36m'; GN=$'\033[1;92m'; RD=$'\033[01;31m'; YW=$'\033[33m'; CL=$'\033[m'
-msg(){ echo -e "${BL}[orbitdesk-update]${CL} $*"; }
-ok(){ echo -e "${GN}[orbitdesk-update]${CL} $*"; }
-warn(){ echo -e "${YW}[orbitdesk-update]${CL} $*"; }
-err(){ echo -e "${RD}[orbitdesk-update]${CL} $*" >&2; exit 1; }
+msg(){ echo -e "${BL}[update]${CL} $*"; }
+ok(){ echo -e "${GN}[update]${CL} $*"; }
+warn(){ echo -e "${YW}[update]${CL} $*"; }
+err(){ echo -e "${RD}[update]${CL} $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -192,6 +193,7 @@ swap_release() {
     install -m 0755 "${APP_DIR}/scripts/orbitdesk-user" /usr/local/bin/orbitdesk-user
   fi
   if [[ -f "${APP_DIR}/scripts/orbitdesk-update" ]]; then
+    install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/update
     install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update
   fi
   chmod +x "${APP_DIR}/scripts/orbitdesk-update.sh" || true
@@ -225,6 +227,7 @@ main() {
   prune_backups
   ok "Update complete — OrbitDesk is healthy on :${APP_PORT}"
   ok "Backup: ${BACKUP_DIR}  |  Fast rollback copy: ${PREVIOUS}"
+  ok "Next time, run: update"
 }
 
 trap 'status=$?; if [[ $status -ne 0 && ${ROLLED_BACK} -eq 0 ]]; then warn "Update aborted"; cleanup_staging; fi' EXIT

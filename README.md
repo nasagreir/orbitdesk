@@ -13,7 +13,7 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 - Grok ops chat grounded in the current dish snapshot
 - First-start landing page to choose your username and password
 - Username/password login with LXC CLI password recovery
-- Safe updates: `orbitdesk-update` backs up first and auto-rolls back if the new build fails
+- Safe updates: `update` backs up first and auto-rolls back if the new build fails
 - Dark + super dark themes
 - Demo mode when credentials are missing so you can explore the UI immediately
 - Single pasteable Proxmox LXC installer
@@ -39,10 +39,12 @@ Creates a Debian 12 LXC, builds OrbitDesk, and enables `orbitdesk.service` on po
 ### Update (LXC CLI)
 
 ```bash
-pct enter <CTID>
-orbitdesk-update
-# optional: orbitdesk-update --branch main
+pct enter CTID
+update
+# optional: update --branch main
 ```
+
+`orbitdesk-update` still works as an alias.
 
 The updater snapshots the live install under `/var/backups/orbitdesk/` and `/opt/orbitdesk.previous`, builds the new release in staging, swaps it in, then health-checks `http://127.0.0.1:3456/api/auth/me`. If the build or health check fails, it restores the previous version automatically.
 
@@ -94,7 +96,7 @@ GROK_API_KEY=xai-...
 | `npm run start` | Serve on `0.0.0.0:3456` |
 | `npm run user -- create admin` | Create login user (CLI) |
 | `npm run user -- reset-password admin` | Recover password |
-| `orbitdesk-update` | Update with backup + auto-rollback (LXC) |
+| `update` | Update with backup + auto-rollback (LXC) |
 | `bash proxmox-install.sh` | Pasteable Proxmox LXC installer |
 
 ## Notes

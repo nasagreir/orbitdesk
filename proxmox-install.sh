@@ -535,7 +535,8 @@ mkdir -p "${APP_DIR}"
 
 # Prefer the dedicated updater when OrbitDesk is already installed
 if [[ -f "${APP_DIR}/package.json" && -x "${APP_DIR}/scripts/orbitdesk-update.sh" && -z "${SOURCE_ARCHIVE}" && -n "${REPO_URL}" ]]; then
-  msg "Existing install detected — using orbitdesk-update (backup + rollback)"
+  msg "Existing install detected — using update (backup + rollback)"
+  install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/update 2>/dev/null || true
   install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update 2>/dev/null || true
   ORBITDESK_REPO="${REPO_URL}" ORBITDESK_BRANCH="${REPO_BRANCH}" ORBITDESK_PORT="${APP_PORT}" \
     bash "${APP_DIR}/scripts/orbitdesk-update.sh" --repo "${REPO_URL}" --branch "${REPO_BRANCH}" --port "${APP_PORT}"
@@ -634,6 +635,7 @@ mkdir -p "${APP_DIR}/data"
 chmod 750 "${APP_DIR}/data"
 
 install -m 0755 "${APP_DIR}/scripts/orbitdesk-user" /usr/local/bin/orbitdesk-user
+install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/update
 install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update
 chmod +x "${APP_DIR}/scripts/orbitdesk-user.mjs" "${APP_DIR}/scripts/orbitdesk-update.sh" || true
 
@@ -683,7 +685,7 @@ IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 msg "Installed — http://${IP:-<ct-ip>}:${APP_PORT}"
 msg "First start: open the URL and create your username / password"
 msg "Config: ${APP_DIR}/.env.local"
-msg "Update: orbitdesk-update   (backs up + auto-rolls back on failure)"
+msg "Update: update   (backs up + auto-rolls back on failure)"
 msg "Users:  orbitdesk-user list | reset-password USERNAME"
 CT_INSTALL_EOF
 }
@@ -730,7 +732,7 @@ done_msg() {
   msg_ok "${APP} is ready"
   echo "  URL    : http://${ip:-<ct-ip>}:${ORBITDESK_PORT}"
   echo "  Setup  : open the URL and create your username / password"
-  echo "  Update : pct enter ${CTID}  then  orbitdesk-update"
+  echo "  Update : pct enter ${CTID}  then  update"
   echo "  CT ID  : ${CTID}"
   echo "  Shell  : pct enter ${CTID}"
   echo "  Logs   : pct exec ${CTID} -- journalctl -u orbitdesk -f"

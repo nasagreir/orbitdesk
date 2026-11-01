@@ -70,7 +70,8 @@ deploy_source() {
       && -f "${APP_DIR}/scripts/orbitdesk-update.sh" \
       && -n "${REPO_URL}" \
       && ! -f "${SOURCE_ARCHIVE}" ]]; then
-    msg "Existing install — delegating to orbitdesk-update"
+    msg "Existing install — delegating to update"
+    install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/update
     install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update
     ORBITDESK_REPO="${REPO_URL}" ORBITDESK_BRANCH="${REPO_BRANCH}" ORBITDESK_PORT="${APP_PORT}" \
       bash "${APP_DIR}/scripts/orbitdesk-update.sh" --repo "${REPO_URL}" --branch "${REPO_BRANCH}" --port "${APP_PORT}"
@@ -187,6 +188,7 @@ EOF
 write_systemd() {
   msg "Installing systemd unit and CLI helpers"
   install -m 0755 "${APP_DIR}/scripts/orbitdesk-user" /usr/local/bin/orbitdesk-user
+  install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/update
   install -m 0755 "${APP_DIR}/scripts/orbitdesk-update" /usr/local/bin/orbitdesk-update
   chmod +x "${APP_DIR}/scripts/orbitdesk-user.mjs" "${APP_DIR}/scripts/orbitdesk-update.sh" || true
 
@@ -239,7 +241,7 @@ print_summary() {
   echo "  Service : systemctl status orbitdesk"
   echo "  URL     : http://${ip:-<container-ip>}:${APP_PORT}"
   echo "  Setup   : open the URL and create your username / password"
-  echo "  Update  : orbitdesk-update   (backup + auto-rollback)"
+  echo "  Update  : update   (backup + auto-rollback)"
   echo "  Config  : ${APP_DIR}/.env.local"
 }
 
