@@ -102,7 +102,7 @@ GROK_API_KEY=xai-...
 
 ## Notes
 
-- Model thumbnails are transparent PNGs (Gen 2 / Gen 3 cutouts derived from [pngimg.com Starlink gallery](https://pngimg.com/images/electronics/starlink), CC BY-NC 4.0).
+- Dish thumbnails are photographs of the real terminals, cropped to a transparent PNG. Mini: still from [Overland Calling, CC BY 3.0](https://commons.wikimedia.org/wiki/File:Starlink_Mini_Overland_and_Camping_Power_Testing.webm). Standard Gen 2: [U.S. Air Force / DVIDS, public domain](https://commons.wikimedia.org/wiki/File:Project-_Go-Comm_(7171249).jpg). Standard Gen 3: [BugWarp, CC BY-SA 4.0](https://commons.wikimedia.org/wiki/File:Starlink_antenna_at_St._Albans_-_BugWarp.jpg). High Performance: [Wikideas1, CC0](https://commons.wikimedia.org/wiki/File:Starlink_dish_02.webp). Flat High Performance: [Tony Webster, CC BY 2.0](https://commons.wikimedia.org/wiki/File:Starlink_Flat_Panel_Roof_Mounted_on_Roof_Rack_(53370205462).jpg).
 - Secrets stay server-side; the browser only talks to OrbitDesk API routes.
 - If HA is configured but unreachable (or no Starlink entities exist), the UI falls back to demo dishes and surfaces the connection message.
 - Layout covers Safari’s Duo viewport range (~382–951 CSS px): bottom nav on phones, two-pane fleet/Grok from ~720px, hinge-aware gutters on the Duo inner display, and Viewport Segments / Device Posture when those Safari feature flags are on.
