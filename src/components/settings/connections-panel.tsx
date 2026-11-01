@@ -58,12 +58,14 @@ POLL_INTERVAL_SECONDS=30
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <p className="text-sm uppercase tracking-[0.2em] text-cyan-300/80">
+        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80 sm:text-sm">
           Integrations
         </p>
-        <h1 className="mt-1 font-heading text-3xl text-white">Connections</h1>
+        <h1 className="mt-1 font-heading text-2xl text-white sm:text-3xl">
+          Connections
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-400 sm:text-base">
           Wire Home Assistant for live Starlink entities and an xAI Grok API key
           for the ops assistant. Secrets stay server-side in environment
@@ -71,7 +73,7 @@ POLL_INTERVAL_SECONDS=30
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="adaptive-split duo-hinge-gutter !gap-4">
         <IntegrationCard
           icon={<Link2 className="size-4" />}
           title="Home Assistant"

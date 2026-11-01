@@ -6,6 +6,7 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 
 - Fleet overview for one or more Starlink dishes (throughput, latency, obstruction, uptime)
 - History tab (24h / 7d / 14d) with fleet charts, per-dish stats, and Grok-suggested improvements
+- Fluid responsive layout (mobile ↔ desktop on resize) plus iPhone Duo inner-display / fold support
 - Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
 - Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
 - Device actions: reboot / stow / unstow via Home Assistant button entities
@@ -93,3 +94,4 @@ GROK_API_KEY=xai-...
 - Model thumbnails are transparent PNGs (Gen 2 / Gen 3 cutouts derived from [pngimg.com Starlink gallery](https://pngimg.com/images/electronics/starlink), CC BY-NC 4.0).
 - Secrets stay server-side; the browser only talks to OrbitDesk API routes.
 - If HA is configured but unreachable (or no Starlink entities exist), the UI falls back to demo dishes and surfaces the connection message.
+- Layout covers Safari’s Duo viewport range (~382–951 CSS px): bottom nav on phones, two-pane fleet/Grok from ~720px, hinge-aware gutters on the Duo inner display, and Viewport Segments / Device Posture when those Safari feature flags are on.

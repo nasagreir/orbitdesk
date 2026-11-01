@@ -138,11 +138,113 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    /* Live layout tokens — updated by useViewportLayout */
+    --od-vw: 100vw;
+    --od-vh: 100dvh;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100dvh;
+    /* Match page chrome so Duo outer side-controls tint correctly */
+    background-color: var(--background);
+  }
+}
+
+/*
+ * Fluid adaptive split: stacks on phones (incl. Duo outer ~382),
+ * two columns from ~720 up through Duo inner landscape (~951) and desktop.
+ * Transitions on the fly as the viewport resizes / folds.
+ * Experimental Device Posture / Viewport Segments live in public/duo-fold.css
+ * (Lightning CSS strips those media features from the Tailwind pipeline).
+ */
+.adaptive-split {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  transition:
+    gap 220ms ease,
+    grid-template-columns 280ms ease;
+}
+
+@media (min-width: 720px) {
+  .adaptive-split {
+    gap: 1.5rem;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+}
+
+/* Duo inner landscape (~951×585): equal panes, gap clears the center crease */
+@media (min-width: 900px) and (max-width: 1024px) and (pointer: coarse) and (max-height: 700px) {
+  .adaptive-split {
+    gap: 1.75rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .duo-hinge-gutter {
+    column-gap: 1.75rem;
+  }
+}
+
+/* Also honor data-layout from useViewportLayout when CSS media alone is ambiguous */
+html[data-layout="duo-inner"] .adaptive-split {
+  gap: 1.75rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+html[data-layout="mobile"] .adaptive-split {
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.adaptive-stats {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  transition: grid-template-columns 240ms ease;
+}
+
+@media (min-width: 640px) {
+  .adaptive-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+html[data-layout="mobile"] .adaptive-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-height: 640px) and (min-width: 720px) {
+  .adaptive-chart-height {
+    height: 11rem !important;
+  }
+}
+
+.safe-px {
+  padding-left: max(1rem, var(--safe-left));
+  padding-right: max(1rem, var(--safe-right));
+}
+
+.safe-pt {
+  padding-top: max(0px, var(--safe-top));
+}
+
+.safe-pb {
+  padding-bottom: max(0px, var(--safe-bottom));
+}
+
+.safe-pb-nav {
+  padding-bottom: calc(4.75rem + var(--safe-bottom));
+}
+
+@media (min-width: 720px) {
+  .safe-pb-nav {
+    padding-bottom: max(0px, var(--safe-bottom));
   }
 }
 

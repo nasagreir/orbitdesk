@@ -15,9 +15,11 @@ const starters = [
 export function GrokAssistant({
   devices,
   grokConfigured,
+  compact = false,
 }: {
   devices: StarlinkDevice[];
   grokConfigured: boolean;
+  compact?: boolean;
 }) {
   const [messages, setMessages] = useState<GrokMessage[]>([
     {
@@ -73,24 +75,28 @@ export function GrokAssistant({
   }
 
   return (
-    <section className="flex h-full min-h-[28rem] flex-col rounded-2xl border border-white/10 bg-[#0c1622]/80">
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
+    <section
+      className={`flex h-full flex-col rounded-2xl border border-white/10 bg-[#0c1622]/80 ${
+        compact ? "min-h-[22rem]" : "min-h-[24rem] sm:min-h-[28rem]"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
             <Bot className="size-4" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h2 className="font-heading text-base text-white">Grok Ops</h2>
-            <p className="text-xs text-slate-400">
+            <p className="truncate text-xs text-slate-400">
               {devices.length} dish snapshot ·{" "}
               {grokConfigured ? "xAI key ready" : "demo replies"}
             </p>
           </div>
         </div>
-        <Sparkles className="size-4 text-cyan-300/70" />
+        <Sparkles className="size-4 shrink-0 text-cyan-300/70" />
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
         {messages.map((message, index) => (
           <div
             key={`${message.role}-${index}`}
@@ -116,8 +122,8 @@ export function GrokAssistant({
         <p className="px-4 pb-2 text-xs text-rose-300">{error}</p>
       )}
 
-      <div className="flex flex-wrap gap-2 border-t border-white/10 px-4 py-3">
-        {starters.map((starter) => (
+      <div className="flex flex-wrap gap-2 border-t border-white/10 px-3 py-2.5 sm:px-4 sm:py-3">
+        {(compact ? starters.slice(0, 2) : starters).map((starter) => (
           <button
             key={starter}
             type="button"

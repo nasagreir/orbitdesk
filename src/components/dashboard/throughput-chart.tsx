@@ -11,13 +11,21 @@ import {
 } from "recharts";
 import type { ThroughputPoint } from "@/lib/types";
 
-export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
+export function ThroughputChart({
+  data,
+  compact = false,
+}: {
+  data: ThroughputPoint[];
+  compact?: boolean;
+}) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-4 sm:p-5">
-      <div className="mb-4 flex items-end justify-between gap-3">
+    <div className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-3 sm:p-4 md:p-5">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 sm:mb-4 sm:gap-3">
         <div>
-          <h2 className="font-heading text-lg text-white">Throughput</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="font-heading text-base text-white sm:text-lg">
+            Throughput
+          </h2>
+          <p className="text-xs text-slate-400 sm:text-sm">
             Downlink / uplink over the last few hours
           </p>
         </div>
@@ -31,7 +39,9 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
         </div>
       </div>
 
-      <div className="h-64 w-full">
+      <div
+        className={`adaptive-chart-height w-full ${compact ? "h-44 sm:h-52" : "h-56 sm:h-64"}`}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
             <defs>

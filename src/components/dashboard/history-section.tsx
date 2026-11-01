@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHistory } from "@/hooks/use-history";
+import { useViewportLayout } from "@/hooks/use-viewport-layout";
 import { formatMbps, formatMs, formatPct } from "@/lib/format";
 import type {
   HistoryInsight,
@@ -56,15 +57,18 @@ export function HistorySection() {
   const [range, setRange] = useState<HistoryRange>("7d");
   const { data, insights, error, loading, insightsLoading, reload } =
     useHistory(range);
+  const layout = useViewportLayout();
+  const chartHeight =
+    layout.duoInnerLandscape || layout.height < 640 ? "h-44" : "h-56";
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-cyan-300/80">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80 sm:text-sm">
             Trends
           </p>
-          <h1 className="mt-1 font-heading text-3xl tracking-tight text-white sm:text-4xl">
+          <h1 className="mt-1 font-heading text-2xl tracking-tight text-white sm:text-3xl md:text-4xl">
             History
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-400 sm:text-base">
@@ -72,14 +76,14 @@ export function HistorySection() {
             suggestions grounded in this window.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="inline-flex flex-1 rounded-lg border border-white/10 bg-white/5 p-1 sm:flex-none">
             {RANGES.map((r) => (
               <button
                 key={r.id}
                 type="button"
                 onClick={() => setRange(r.id)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors sm:flex-none sm:px-3 ${
                   range === r.id
                     ? "bg-cyan-400/20 text-cyan-100"
                     : "text-slate-400 hover:text-slate-200"
@@ -102,9 +106,9 @@ export function HistorySection() {
       </div>
 
       {loading && !data ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-72 animate-pulse rounded-2xl bg-white/5" />
-          <div className="h-72 animate-pulse rounded-2xl bg-white/5" />
+        <div className="adaptive-split">
+          <div className="h-56 animate-pulse rounded-2xl bg-white/5 sm:h-72" />
+          <div className="h-56 animate-pulse rounded-2xl bg-white/5 sm:h-72" />
         </div>
       ) : error && !data ? (
         <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-5 text-rose-100">
@@ -120,7 +124,7 @@ export function HistorySection() {
         </div>
       ) : data ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="adaptive-stats">
             <MiniStat
               label="Avg downlink"
               value={formatMbps(data.summary.avgDownlinkMbps)}
@@ -139,11 +143,11 @@ export function HistorySection() {
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-4 sm:p-5">
+          <div className="adaptive-split duo-hinge-gutter">
+            <div className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-3 sm:p-4 md:p-5">
               <div className="mb-3 flex items-center gap-2">
-                <TrendingUp className="size-4 text-cyan-300" />
-                <div>
+                <TrendingUp className="size-4 shrink-0 text-cyan-300" />
+                <div className="min-w-0">
                   <h3 className="font-heading text-base text-white">
                     Throughput history
                   </h3>
@@ -152,7 +156,7 @@ export function HistorySection() {
                   </p>
                 </div>
               </div>
-              <div className="h-56 w-full">
+              <div className={`${chartHeight} adaptive-chart-height w-full`}>
                 {data.series.length === 0 ? (
                   <EmptyChart message="No samples in this window yet." />
                 ) : (
@@ -245,10 +249,10 @@ export function HistorySection() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-4 sm:p-5">
+            <div className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-3 sm:p-4 md:p-5">
               <div className="mb-3 flex items-center gap-2">
-                <AlertTriangle className="size-4 text-amber-300" />
-                <div>
+                <AlertTriangle className="size-4 shrink-0 text-amber-300" />
+                <div className="min-w-0">
                   <h3 className="font-heading text-base text-white">
                     Latency & obstruction
                   </h3>
@@ -257,7 +261,7 @@ export function HistorySection() {
                   </p>
                 </div>
               </div>
-              <div className="h-56 w-full">
+              <div className={`${chartHeight} adaptive-chart-height w-full`}>
                 {data.series.length === 0 ? (
                   <EmptyChart message="No samples in this window yet." />
                 ) : (
@@ -448,7 +452,7 @@ function InsightsPanel({
           </button>
         </div>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {insights.map((insight) => {
             const style = PRIORITY_STYLE[insight.priority];
             return (

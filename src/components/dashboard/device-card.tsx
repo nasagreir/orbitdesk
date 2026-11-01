@@ -44,12 +44,14 @@ export function DeviceCard({
   onSelect,
   onActionDone,
   onDeviceUpdated,
+  compact = false,
 }: {
   device: StarlinkDevice;
   selected: boolean;
   onSelect: () => void;
   onActionDone: (message: string) => void;
   onDeviceUpdated?: () => void;
+  compact?: boolean;
 }) {
   const [pending, setPending] = useState<StarlinkAction | "roam" | null>(null);
   const [savingModel, setSavingModel] = useState(false);
@@ -155,17 +157,19 @@ export function DeviceCard({
 
   return (
     <article
-      className={`rounded-2xl border p-4 transition ${
+      className={`rounded-2xl border p-3 transition sm:p-4 ${
         selected
           ? "border-cyan-400/50 bg-[color:var(--card)] shadow-[0_0_0_1px_rgba(34,211,238,0.2)]"
           : "border-white/10 bg-[color:var(--card)]/80 hover:border-white/20"
       }`}
     >
-      <div className="flex gap-4">
+      <div className={`flex ${compact ? "gap-3" : "gap-3 sm:gap-4"}`}>
         <button
           type="button"
           onClick={onSelect}
-          className="relative size-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-transparent sm:size-28"
+          className={`relative shrink-0 overflow-hidden rounded-xl border border-white/10 bg-transparent ${
+            compact ? "size-20" : "size-20 sm:size-24 md:size-28"
+          }`}
           title={model?.name ?? "Assign a Starlink model"}
         >
           {model ? (

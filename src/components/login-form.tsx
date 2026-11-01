@@ -69,23 +69,23 @@ export function LoginForm() {
 
   if (checking) {
     return (
-      <div className="flex min-h-full flex-1 items-center justify-center text-slate-400">
+      <div className="flex min-h-dvh flex-1 items-center justify-center text-slate-400">
         Loading…
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-full flex-1 items-center justify-center px-4 py-10">
+    <div className="safe-pb safe-pt relative flex min-h-dvh flex-1 items-center justify-center px-4 py-10">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="starfield absolute inset-0 opacity-70" />
       </div>
 
-      <div className="absolute right-4 top-4 z-20">
+      <div className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-20">
         <ThemeToggle />
       </div>
 
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[color:var(--card)]/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[color:var(--card)]/90 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
         <div className="mb-6 flex items-center gap-3">
           <span className="flex size-11 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
             <Orbit className="size-5" />

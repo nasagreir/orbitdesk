@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { History, LogOut, Orbit, Settings2, Satellite } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { useViewportLayout } from "@/hooks/use-viewport-layout";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -17,7 +18,9 @@ const links = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const layout = useViewportLayout();
   const [username, setUsername] = useState<string | null>(null);
+  const useBottomNav = layout.mode === "mobile" && !layout.foldedSplit;
 
   useEffect(() => {
     void (async () => {
@@ -42,56 +45,73 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative min-h-full flex flex-col">
+    <div className="relative flex min-h-dvh flex-col">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="starfield absolute inset-0 opacity-70" />
-        <div className="atmosphere-glow absolute -top-32 left-1/2 h-[28rem] w-[48rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.18),transparent_65%)] blur-2xl" />
+        <div className="atmosphere-glow absolute -top-32 left-1/2 h-[28rem] w-[min(48rem,100%)] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.18),transparent_65%)] blur-2xl" />
         <div className="atmosphere-glow absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.12),transparent_70%)] blur-3xl" />
       </div>
 
-      <header className="relative z-10 border-b border-white/10 bg-[color:var(--background)]/70 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link href="/" className="group flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_24px_rgba(34,211,238,0.15)] transition group-hover:border-cyan-300/50">
-              <Orbit className="size-5 animate-[spin_12s_linear_infinite]" />
+      <header className="safe-pt relative z-10 border-b border-white/10 bg-[color:var(--background)]/70 backdrop-blur-xl">
+        <div className="safe-px mx-auto flex w-full max-w-7xl items-center justify-between gap-3 py-3 sm:gap-4 sm:py-4">
+          <Link href="/" className="group flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_24px_rgba(34,211,238,0.15)] transition group-hover:border-cyan-300/50 sm:size-10">
+              <Orbit className="size-4 animate-[spin_12s_linear_infinite] sm:size-5" />
             </span>
-            <span>
-              <span className="block font-heading text-lg tracking-tight text-white sm:text-xl">
+            <span className="min-w-0">
+              <span className="block font-heading text-base tracking-tight text-white sm:text-xl">
                 OrbitDesk
               </span>
-              <span className="block text-xs text-slate-400">
+              <span className="hidden text-xs text-slate-400 sm:block">
                 Starlink · Home Assistant · Grok
+              </span>
+              <span className="block text-[10px] text-slate-500 sm:hidden">
+                {layout.mode === "duo-inner"
+                  ? "Duo inner"
+                  : layout.mode === "mobile"
+                    ? "Mobile"
+                    : "Ops"}
               </span>
             </span>
           </Link>
 
-          <div className="flex items-center gap-2">
-            <nav className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-              {links.map(({ href, label, icon: Icon }) => {
-                const active =
-                  href === "/" ? pathname === "/" : pathname.startsWith(href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition",
-                      active
-                        ? "bg-cyan-400/15 text-cyan-200"
-                        : "text-slate-400 hover:text-slate-200",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    <span className="hidden sm:inline">{label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {!useBottomNav && (
+              <nav className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+                {links.map(({ href, label, icon: Icon }) => {
+                  const active =
+                    href === "/" ? pathname === "/" : pathname.startsWith(href);
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full px-2.5 py-1.5 text-sm transition sm:px-3",
+                        active
+                          ? "bg-cyan-400/15 text-cyan-200"
+                          : "text-slate-400 hover:text-slate-200",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      <span
+                        className={cn(
+                          layout.mode === "duo-inner" || layout.width < 900
+                            ? "sr-only sm:not-sr-only sm:inline"
+                            : "hidden sm:inline",
+                        )}
+                      >
+                        {label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
 
             <ThemeToggle />
 
             {username && (
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="hidden items-center gap-2 md:flex">
                 <span className="max-w-[8rem] truncate text-xs text-slate-400">
                   {username}
                 </span>
@@ -113,7 +133,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 variant="outline"
                 size="icon-sm"
                 onClick={() => void logout()}
-                className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10 sm:hidden"
+                className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10 md:hidden"
                 title="Log out"
               >
                 <LogOut className="size-4" />
@@ -123,9 +143,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+      <main
+        className={cn(
+          "safe-px relative z-10 mx-auto w-full max-w-7xl flex-1 py-4 sm:py-6 md:py-8",
+          useBottomNav ? "safe-pb-nav" : "safe-pb",
+        )}
+      >
         {children}
       </main>
+
+      {useBottomNav && (
+        <nav
+          className="safe-pb fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[color:var(--background)]/90 backdrop-blur-xl"
+          aria-label="Primary"
+        >
+          <div className="mx-auto grid max-w-lg grid-cols-3 gap-1 px-2 pt-1.5">
+            {links.map(({ href, label, icon: Icon }) => {
+              const active =
+                href === "/" ? pathname === "/" : pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 text-[11px] transition",
+                    active
+                      ? "bg-cyan-400/15 text-cyan-200"
+                      : "text-slate-400 hover:text-slate-200",
+                  )}
+                >
+                  <Icon className="size-5" />
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

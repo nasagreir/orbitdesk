@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -23,6 +23,25 @@ export const metadata: Metadata = {
   title: "OrbitDesk · Starlink Ops",
   description:
     "Monitor and manage Starlink dishes with Home Assistant and Grok.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "OrbitDesk",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+/** Cover Duo outer side-controls + notch; fluid CSS px across 382–951. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#071018" },
+    { color: "#071018" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -32,7 +51,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${spaceGrotesk.variable} ${spaceSans.variable} ${plexMono.variable} dark h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <head>
+        {/* Static so Lightning CSS does not strip Duo fold media features */}
+        <link rel="stylesheet" href="/duo-fold.css" />
+      </head>
+      <body className="flex min-h-dvh flex-col bg-background text-foreground">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

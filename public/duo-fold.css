@@ -1,0 +1,64 @@
+/**
+ * iPhone Duo fold / Viewport Segments enhancements.
+ * Served as a static stylesheet so Lightning CSS does not strip
+ * experimental media features (device-posture, viewport-segments).
+ * Progressive enhancement only — core responsive layout lives in globals.css.
+ */
+
+@media (horizontal-viewport-segments: 2) {
+  .adaptive-split {
+    gap: 0;
+    grid-template-columns:
+      env(viewport-segment-width 0 0)
+      env(viewport-segment-width 1 0);
+  }
+
+  .adaptive-split > :nth-child(1) {
+    padding-inline: max(0.75rem, var(--safe-left, 0px))
+      max(
+        0.75rem,
+        calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0))
+      );
+  }
+
+  .adaptive-split > :nth-child(2) {
+    padding-inline: max(
+        0.75rem,
+        calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0))
+      )
+      max(0.75rem, var(--safe-right, 0px));
+  }
+}
+
+@media (vertical-viewport-segments: 2) {
+  .adaptive-split {
+    gap: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows:
+      env(viewport-segment-height 0 0)
+      env(viewport-segment-height 0 1);
+  }
+
+  .adaptive-split > :nth-child(1) {
+    padding-block: max(0.5rem, var(--safe-top, 0px))
+      max(
+        0.75rem,
+        calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0))
+      );
+  }
+
+  .adaptive-split > :nth-child(2) {
+    padding-block: max(
+        0.75rem,
+        calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0))
+      )
+      max(0.5rem, var(--safe-bottom, 0px));
+    overflow: auto;
+  }
+}
+
+@media (device-posture: folded) {
+  .adaptive-split {
+    gap: 1.25rem;
+  }
+}
