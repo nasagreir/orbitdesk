@@ -42,10 +42,11 @@ GROK_API_KEY="${GROK_API_KEY:-}"
 
 APP="OrbitDesk"
 YW=$'\033[33m'; BL=$'\033[36m'; GN=$'\033[1;92m'; RD=$'\033[01;31m'; CL=$'\033[m'; BOLD=$'\033[1m'
-msg_info() { echo -e "${BL}${BOLD}[INFO]${CL} $1"; }
-msg_ok()   { echo -e "${GN}${BOLD}[OK]${CL} $1"; }
-msg_warn() { echo -e "${YW}${BOLD}[WARN]${CL} $1"; }
-msg_error(){ echo -e "${RD}${BOLD}[ERROR]${CL} $1"; exit 1; }
+# Always log to stderr so command substitutions (e.g. pick_template) stay clean
+msg_info() { echo -e "${BL}${BOLD}[INFO]${CL} $1" >&2; }
+msg_ok()   { echo -e "${GN}${BOLD}[OK]${CL} $1" >&2; }
+msg_warn() { echo -e "${YW}${BOLD}[WARN]${CL} $1" >&2; }
+msg_error(){ echo -e "${RD}${BOLD}[ERROR]${CL} $1" >&2; exit 1; }
 
 # Parse flags early (supports: script.sh --yes   OR   bash -c "$(curl ...)" -- --yes)
 AUTO_YES=0
@@ -208,6 +209,7 @@ default_bridge() {
 
 pick_template() {
   local tmpl_storage="$1" template volid
+  # stdout must be ONLY the volume id — all logs go to stderr
   template="$(pveam list "${tmpl_storage}" 2>/dev/null | awk '/debian-12-standard/ {print $1; exit}')"
   if [[ -z "${template}" ]]; then
     msg_info "Downloading Debian 12 template → storage '${tmpl_storage}' (not rootfs storage)"
@@ -218,13 +220,18 @@ pick_template() {
       volid="$(pveam available 2>/dev/null | awk '/debian-12-standard/ {print $2; exit}')"
     fi
     [[ -n "${volid}" ]] || msg_error "debian-12-standard template not found in pveam available."
-    if ! pveam download "${tmpl_storage}" "${volid}"; then
+    # pveam download progress belongs on the terminal, not in $template
+    if ! pveam download "${tmpl_storage}" "${volid}" >&2; then
       msg_error "Failed to download template to '${tmpl_storage}'. That storage must support 'vztmpl' (use local, not local-lvm)."
     fi
     template="$(pveam list "${tmpl_storage}" 2>/dev/null | awk '/debian-12-standard/ {print $1; exit}')"
   fi
   [[ -n "${template}" ]] || msg_error "Template missing on ${tmpl_storage}."
-  echo "${template}"
+  # Normalize: some hosts return a bare filename; pct wants storage:vztmpl/...
+  if [[ "${template}" != *:* ]]; then
+    template="${tmpl_storage}:vztmpl/${template}"
+  fi
+  printf '%s\n' "${template}"
 }
 
 # Detect local checkout when this file lives inside the OrbitDesk repo
