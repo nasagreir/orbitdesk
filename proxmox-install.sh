@@ -123,12 +123,92 @@ confirm_yn() {
   [[ "${a:-$d}" =~ ^[Yy]$ ]]
 }
 
+# True if VM/CT id is used anywhere in the cluster (not just this node)
+id_in_use() {
+  local id="$1"
+
+  # Shared cluster config (covers guests on other nodes like 'pve')
+  if [[ -f /etc/pve/.vmlist ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      jq -e --arg id "${id}" '.ids[$id] != null' /etc/pve/.vmlist >/dev/null 2>&1 && return 0
+    elif grep -Eq "\"${id}\"[[:space:]]*:" /etc/pve/.vmlist 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  # Local guests
+  pct status "${id}" &>/dev/null && return 0
+  qm status "${id}" &>/dev/null && return 0
+
+  # Cluster resources API
+  if command -v pvesh >/dev/null 2>&1; then
+    if pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+      | grep -Eq "\"vmid\"[[:space:]]*:[[:space:]]*${id}([,}]|$)"; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+id_location_hint() {
+  local id="$1" hint=""
+  if [[ -f /etc/pve/.vmlist ]] && command -v jq >/dev/null 2>&1; then
+    hint="$(jq -r --arg id "${id}" '.ids[$id] | "\(.type // "?") on \(.node // "?")"' /etc/pve/.vmlist 2>/dev/null || true)"
+    [[ "${hint}" == *"null"* ]] && hint=""
+  fi
+  echo "${hint}"
+}
+
 next_ctid() {
-  local id=100
-  while pct status "${id}" &>/dev/null || qm status "${id}" &>/dev/null 2>/dev/null; do
+  local id nid
+
+  # Official cluster-wide free ID
+  if command -v pvesh >/dev/null 2>&1; then
+    nid="$(pvesh get /cluster/nextid 2>/dev/null || true)"
+    if [[ "${nid}" =~ ^[0-9]+$ ]] && ! id_in_use "${nid}"; then
+      echo "${nid}"
+      return
+    fi
+  fi
+
+  id=100
+  while id_in_use "${id}"; do
     id=$((id + 1))
+    # Stay in typical CT range; wrap upward only
+    if (( id > 999999 )); then
+      msg_error "Could not find a free CT/VM ID."
+    fi
   done
   echo "${id}"
+}
+
+ensure_free_ctid() {
+  local requested="$1" hint free
+  if ! id_in_use "${requested}"; then
+    echo "${requested}"
+    return
+  fi
+
+  hint="$(id_location_hint "${requested}")"
+  free="$(next_ctid)"
+
+  if [[ -n "${ORBITDESK_CTID}" && "${AUTO_YES}" -eq 1 ]]; then
+    msg_error "CT/VM ID ${requested} is already in use${hint:+ (${hint})}. Unset ORBITDESK_CTID or pick a free ID (next free: ${free})."
+  fi
+
+  if [[ "${AUTO_YES}" -eq 1 ]]; then
+    msg_warn "ID ${requested} already in use${hint:+ (${hint})} — using free ID ${free}"
+    echo "${free}"
+    return
+  fi
+
+  msg_warn "ID ${requested} already in use${hint:+ (${hint})}"
+  prompt requested "LXC CT ID (cluster-wide unique)" "${free}"
+  if id_in_use "${requested}"; then
+    msg_error "CT/VM ID ${requested} is still in use. Try ${free}."
+  fi
+  echo "${requested}"
 }
 
 # Prefer "local" for templates; never pick LVM-thin for vztmpl.
@@ -260,8 +340,10 @@ gather() {
   echo
 
   CTID="${ORBITDESK_CTID:-$(next_ctid)}"
-  prompt CTID "LXC CT ID" "${CTID}"
-  pct status "${CTID}" &>/dev/null && msg_error "CT ${CTID} already exists. Set ORBITDESK_CTID=… or remove it."
+  if [[ "${AUTO_YES}" -eq 0 ]]; then
+    prompt CTID "LXC CT ID (cluster-wide unique)" "${CTID}"
+  fi
+  CTID="$(ensure_free_ctid "${CTID}")"
 
   HN="${ORBITDESK_HOSTNAME}"
   CORES="${ORBITDESK_CORES}"
@@ -350,9 +432,18 @@ create_ct() {
     args+=(--password "${password}")
   fi
 
-  if ! pct "${args[@]}"; then
+  local create_log
+  create_log="$(mktemp)"
+  if ! pct "${args[@]}" >"${create_log}" 2>&1; then
+    cat "${create_log}" >&2 || true
+    if grep -qiE 'already exists|unique' "${create_log}" 2>/dev/null; then
+      rm -f "${create_log}"
+      msg_error "CT/VM ID ${CTID} is already taken in this cluster. Re-run with --yes (auto-picks a free ID) or ORBITDESK_CTID=$(next_ctid)."
+    fi
+    rm -f "${create_log}"
     msg_error "pct create failed. Template storage must support vztmpl; rootfs storage must support rootdir."
   fi
+  rm -f "${create_log}"
   msg_ok "CT ${CTID} created"
   [[ -z "${password}" ]] || msg_warn "CT root password: ${password}"
 }
