@@ -35,6 +35,7 @@ export function buildStarlinkSystemPrompt(devices: StarlinkDevice[]): string {
     uptimeSeconds: d.uptimeSeconds,
     alerts: d.alerts,
     roamEnabled: Boolean(d.roamEnabled),
+    wanFailover: Boolean(d.wanFailover),
     alarmsPaused: Boolean(d.alarmsPaused),
   }));
 
@@ -43,7 +44,8 @@ export function buildStarlinkSystemPrompt(devices: StarlinkDevice[]): string {
     "Help the operator interpret dish telemetry, Home Assistant entities, and recovery steps.",
     "Be concise, practical, and specific to the live snapshot when available.",
     "Prefer actionable advice (clear obstructions, reboot via HA, check power/roaming) over generic networking tips.",
-    "If alarmsPaused or roamEnabled is true, the dish is in travel/roam mode — do not treat offline as an incident and do not recommend reboot for being down.",
+    "If roamEnabled is true, the dish is in travel/roam mode — do not treat offline as an incident and do not recommend reboot for being down.",
+    "If wanFailover is true, the dish is the backup WAN. Idle or offline is expected while the primary circuit is up. Do not treat that as an outage. If the dish is online, describe it as the failover path being up.",
     "Current dish snapshot (JSON):",
     JSON.stringify(snapshot, null, 2),
   ].join("\n");
@@ -100,7 +102,8 @@ export function demoGrokReply(
   const degraded = devices.filter(
     (d) => d.health !== "online" && !d.alarmsPaused,
   );
-  const traveling = devices.filter((d) => d.alarmsPaused);
+  const traveling = devices.filter((d) => d.roamEnabled);
+  const failover = devices.filter((d) => d.wanFailover);
   const worst = [...devices].sort(
     (a, b) => b.obstructionPct - a.obstructionPct,
   )[0];
@@ -138,6 +141,9 @@ export function demoGrokReply(
       : "Fleet is healthy.",
     traveling.length
       ? `${traveling.length} in travel mode with down-alarms paused.`
+      : "",
+    failover.length
+      ? `${failover.length} marked WAN failover (backup circuit, idle is expected).`
       : "",
     "Ask about reboot steps, obstruction, or latency and I’ll use the live telemetry once Grok is connected.",
   ]

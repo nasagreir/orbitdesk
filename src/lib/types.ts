@@ -27,7 +27,10 @@ export interface StarlinkDevice {
   /** Mini roam / travel mode */
   roamEnabled?: boolean;
   roamNote?: string;
-  /** True when travel/roam mode has paused offline/down alarming */
+  /** Dish is the backup WAN, not the primary circuit */
+  wanFailover?: boolean;
+  wanFailoverNote?: string;
+  /** True when travel or WAN failover has paused offline/down alarming */
   alarmsPaused?: boolean;
 }
 

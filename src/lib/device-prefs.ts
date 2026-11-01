@@ -11,6 +11,8 @@ export interface DevicePrefs {
   modelId?: StarlinkModelId;
   roamEnabled?: boolean;
   roamNote?: string;
+  wanFailover?: boolean;
+  wanFailoverNote?: string;
 }
 
 interface PrefsFile {
@@ -98,6 +100,18 @@ export async function updateDevicePrefs(
 
   if (patch.roamNote !== undefined) {
     next.roamNote = patch.roamNote.trim().slice(0, 80) || undefined;
+  }
+
+  if (patch.wanFailover !== undefined) {
+    next.wanFailover = patch.wanFailover;
+    if (!patch.wanFailover) {
+      next.wanFailoverNote = undefined;
+    }
+  }
+
+  if (patch.wanFailoverNote !== undefined) {
+    next.wanFailoverNote =
+      patch.wanFailoverNote.trim().slice(0, 80) || undefined;
   }
 
   data.devices[deviceId] = next;

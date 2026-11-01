@@ -9,6 +9,7 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 - Fluid responsive layout (mobile ↔ desktop on resize) plus iPhone Duo inner-display / fold support
 - Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
 - Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
+- **WAN failover** status — mark a dish as the backup circuit so idle or down is not an alert
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
 - First-start landing page to choose your username and password

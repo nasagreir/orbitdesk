@@ -123,7 +123,7 @@ export function FleetOverview() {
           <div className="grid gap-3 sm:gap-4">
             {devices.map((device) => (
               <DeviceCard
-                key={`${device.id}-${device.modelId ?? "none"}-${device.roamEnabled ? "roam" : "home"}-${device.roamNote ?? ""}`}
+                key={`${device.id}-${device.modelId ?? "none"}-${device.roamEnabled ? "roam" : "home"}-${device.wanFailover ? "failover" : "primary"}-${device.roamNote ?? ""}-${device.wanFailoverNote ?? ""}`}
                 device={device}
                 selected={selected?.id === device.id}
                 onSelect={() => setSelectedId(device.id)}

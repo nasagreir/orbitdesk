@@ -15,6 +15,8 @@ const bodySchema = z.object({
     .optional(),
   roamEnabled: z.boolean().optional(),
   roamNote: z.string().max(80).optional(),
+  wanFailover: z.boolean().optional(),
+  wanFailoverNote: z.string().max(80).optional(),
 });
 
 export async function PATCH(
@@ -31,7 +33,9 @@ export async function PATCH(
     if (
       parsed.data.modelId === undefined &&
       parsed.data.roamEnabled === undefined &&
-      parsed.data.roamNote === undefined
+      parsed.data.roamNote === undefined &&
+      parsed.data.wanFailover === undefined &&
+      parsed.data.wanFailoverNote === undefined
     ) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
     }

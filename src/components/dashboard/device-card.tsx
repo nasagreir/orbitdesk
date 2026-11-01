@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   MapPinned,
   RotateCcw,
+  Router,
   ShieldAlert,
   Signal,
 } from "lucide-react";
@@ -53,9 +54,14 @@ export function DeviceCard({
   onDeviceUpdated?: () => void;
   compact?: boolean;
 }) {
-  const [pending, setPending] = useState<StarlinkAction | "roam" | null>(null);
+  const [pending, setPending] = useState<
+    StarlinkAction | "roam" | "failover" | null
+  >(null);
   const [savingModel, setSavingModel] = useState(false);
   const [roamNote, setRoamNote] = useState(device.roamNote ?? "");
+  const [failoverNote, setFailoverNote] = useState(
+    device.wanFailoverNote ?? "",
+  );
   const model = getStarlinkModel(device.modelId);
   const canRoam = Boolean(model?.supportsRoam);
   const alarmsPaused = Boolean(device.alarmsPaused && device.roamEnabled);
@@ -84,6 +90,8 @@ export function DeviceCard({
     modelId?: StarlinkModelId;
     roamEnabled?: boolean;
     roamNote?: string;
+    wanFailover?: boolean;
+    wanFailoverNote?: string;
   }) {
     const res = await fetch(`/api/devices/${device.id}/prefs`, {
       method: "PATCH",
@@ -144,6 +152,43 @@ export function DeviceCard({
     }
   }
 
+  async function toggleFailover() {
+    const next = !device.wanFailover;
+    setPending("failover");
+    try {
+      await savePrefs({
+        wanFailover: next,
+        wanFailoverNote: next
+          ? failoverNote || device.wanFailoverNote
+          : undefined,
+      });
+      onActionDone(
+        next
+          ? `WAN failover on${failoverNote ? ` — ${failoverNote}` : ""}`
+          : "WAN failover cleared — dish is a primary circuit again",
+      );
+      onDeviceUpdated?.();
+    } catch (error) {
+      onActionDone(
+        error instanceof Error ? error.message : "WAN failover update failed",
+      );
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function saveFailoverNote() {
+    try {
+      await savePrefs({ wanFailoverNote: failoverNote });
+      onActionDone("WAN failover note saved");
+      onDeviceUpdated?.();
+    } catch (error) {
+      onActionDone(
+        error instanceof Error ? error.message : "Could not save note",
+      );
+    }
+  }
+
   async function saveRoamNote() {
     if (!canRoam) return;
     try {
@@ -200,12 +245,18 @@ export function DeviceCard({
                 <Badge
                   variant="outline"
                   className={
-                    offlineAlarmsPaused
-                      ? offlinePausedStyle
-                      : healthStyles[device.health]
+                    device.wanFailover
+                      ? "border-sky-400/40 bg-sky-400/10 text-sky-100"
+                      : offlineAlarmsPaused
+                        ? offlinePausedStyle
+                        : healthStyles[device.health]
                   }
                 >
-                  {offlineAlarmsPaused ? "offline · paused" : device.health}
+                  {device.wanFailover
+                    ? "WAN failover"
+                    : offlineAlarmsPaused
+                      ? "offline · paused"
+                      : device.health}
                 </Badge>
                 {model && (
                   <Badge
@@ -213,6 +264,15 @@ export function DeviceCard({
                     className="border-cyan-400/30 text-cyan-200"
                   >
                     {model.shortName}
+                  </Badge>
+                )}
+                {device.wanFailover && (
+                  <Badge
+                    variant="outline"
+                    className="border-sky-400/30 text-sky-200"
+                  >
+                    <Router className="mr-1 size-3" />
+                    {device.health === "online" ? "backup up" : "standby"}
                   </Badge>
                 )}
                 {device.roamEnabled && canRoam && (
@@ -336,7 +396,67 @@ export function DeviceCard({
         </div>
       )}
 
-      {alarmsPaused && (
+      <div className="mt-4 rounded-xl border border-sky-400/20 bg-sky-400/5 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium text-sky-100">WAN failover</p>
+            <p className="text-xs text-slate-400">
+              Mark this dish as the backup circuit. Idle or down is not an
+              alert while the primary WAN is up.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending !== null}
+            onClick={() => void toggleFailover()}
+            className={
+              device.wanFailover
+                ? "border-sky-400/40 bg-sky-400/15 text-sky-100"
+                : "border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
+            }
+          >
+            {pending === "failover" ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Router className="size-4" />
+            )}
+            {device.wanFailover ? "Clear failover" : "Set failover"}
+          </Button>
+        </div>
+        {device.wanFailover && (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={failoverNote}
+              onChange={(e) => setFailoverNote(e.target.value)}
+              placeholder="Primary circuit (e.g. Fiber, LTE)"
+              className="border-white/10 bg-black/20 text-slate-100"
+              maxLength={80}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void saveFailoverNote()}
+              className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
+            >
+              Save note
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {device.wanFailover && (
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-400/5 px-3 py-2 text-xs text-sky-100">
+          <Router className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Status is WAN failover
+            {device.wanFailoverNote ? ` — ${device.wanFailoverNote}` : ""}.
+            Link is {device.health}. Down alarms stay paused.
+          </span>
+        </div>
+      )}
+
+      {alarmsPaused && !device.wanFailover && (
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-violet-400/20 bg-violet-400/5 px-3 py-2 text-xs text-violet-100">
           <MapPinned className="mt-0.5 size-3.5 shrink-0" />
           <span>

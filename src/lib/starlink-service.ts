@@ -31,22 +31,27 @@ const DOWN_ALERT =
   /offline|unreachable|not connected|no connectivity|dish down|dish offline|link down/i;
 
 /**
- * Travel / roam mode: keep health telemetry accurate, but pause alarming
- * that the dish is down (expected while packed or in transit).
+ * Travel and WAN failover: keep health telemetry accurate, but pause
+ * alarming that the dish is down. Travel means it is packed. WAN failover
+ * means it is the backup circuit and idle is expected.
  */
 export function applyTravelModeAlarms(
   device: StarlinkDevice,
 ): StarlinkDevice {
   const roamEnabled = Boolean(device.roamEnabled);
+  const wanFailover = Boolean(device.wanFailover);
   let alerts = device.alerts.filter(
-    (alert) => !alert.startsWith("Travel mode —"),
+    (alert) =>
+      !alert.startsWith("Travel mode —") &&
+      !alert.startsWith("WAN failover —"),
   );
 
-  if (roamEnabled) {
+  if (roamEnabled || wanFailover) {
     alerts = alerts.filter((alert) => !DOWN_ALERT.test(alert));
     return {
       ...device,
-      roamEnabled: true,
+      roamEnabled,
+      wanFailover,
       alerts,
       alarmsPaused: true,
     };
@@ -62,6 +67,7 @@ export function applyTravelModeAlarms(
   return {
     ...device,
     roamEnabled: false,
+    wanFailover: false,
     alerts,
     alarmsPaused: false,
   };
@@ -79,6 +85,8 @@ async function applyDevicePrefs(
           modelId: p.modelId ?? device.modelId,
           roamEnabled: p.roamEnabled ?? device.roamEnabled,
           roamNote: p.roamNote ?? device.roamNote,
+          wanFailover: p.wanFailover ?? device.wanFailover,
+          wanFailoverNote: p.wanFailoverNote ?? device.wanFailoverNote,
         }
       : device;
     return applyTravelModeAlarms(withPrefs);
