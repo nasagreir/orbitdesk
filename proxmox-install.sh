@@ -8,6 +8,10 @@
 #
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 #
+# Fully automatic (no prompts):
+#
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)" -- --yes
+#
 # =============================================================================
 set -euo pipefail
 
@@ -25,8 +29,12 @@ ORBITDESK_CORES="${ORBITDESK_CORES:-2}"
 ORBITDESK_MEMORY="${ORBITDESK_MEMORY:-2048}"
 ORBITDESK_DISK="${ORBITDESK_DISK:-8}"
 ORBITDESK_BRIDGE="${ORBITDESK_BRIDGE:-vmbr0}"
+# Root filesystem storage (rootdir) — e.g. local-lvm / local-zfs
 ORBITDESK_STORAGE="${ORBITDESK_STORAGE:-}"
+# Template storage (vztmpl) — e.g. local  (MUST support templates; not LVM-thin)
+ORBITDESK_TEMPLATE_STORAGE="${ORBITDESK_TEMPLATE_STORAGE:-}"
 ORBITDESK_UNPRIVILEGED="${ORBITDESK_UNPRIVILEGED:-1}"
+ORBITDESK_YES="${ORBITDESK_YES:-0}"
 HOME_ASSISTANT_URL="${HOME_ASSISTANT_URL:-}"
 HOME_ASSISTANT_TOKEN="${HOME_ASSISTANT_TOKEN:-}"
 GROK_API_KEY="${GROK_API_KEY:-}"
@@ -38,6 +46,38 @@ msg_info() { echo -e "${BL}${BOLD}[INFO]${CL} $1"; }
 msg_ok()   { echo -e "${GN}${BOLD}[OK]${CL} $1"; }
 msg_warn() { echo -e "${YW}${BOLD}[WARN]${CL} $1"; }
 msg_error(){ echo -e "${RD}${BOLD}[ERROR]${CL} $1"; exit 1; }
+
+# Parse flags early (supports: script.sh --yes   OR   bash -c "$(curl ...)" -- --yes)
+AUTO_YES=0
+for arg in "$@"; do
+  case "${arg}" in
+    -y|--yes|--auto) AUTO_YES=1 ;;
+    -h|--help)
+      cat <<EOF
+OrbitDesk Proxmox LXC installer
+
+Usage:
+  bash proxmox-install.sh [--yes]
+  bash -c "\$(curl -fsSL ${ORBITDESK_GITHUB_RAW}/main/proxmox-install.sh)" -- --yes
+
+Options:
+  -y, --yes, --auto   No prompts — use sensible defaults and install
+  -h, --help          Show this help
+
+Env overrides: ORBITDESK_REPO, ORBITDESK_BRANCH, ORBITDESK_PORT, ORBITDESK_CTID,
+  ORBITDESK_HOSTNAME, ORBITDESK_CORES, ORBITDESK_MEMORY, ORBITDESK_DISK,
+  ORBITDESK_BRIDGE, ORBITDESK_STORAGE (rootfs), ORBITDESK_TEMPLATE_STORAGE,
+  HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, GROK_API_KEY
+EOF
+      exit 0
+      ;;
+  esac
+done
+[[ "${ORBITDESK_YES}" == "1" || "${ORBITDESK_YES}" == "true" ]] && AUTO_YES=1
+# Non-interactive stdin (piped curl|bash without a TTY) → auto
+if [[ ! -t 0 && "${AUTO_YES}" -eq 0 ]]; then
+  AUTO_YES=1
+fi
 
 header() {
   clear 2>/dev/null || true
@@ -51,6 +91,7 @@ ${BOLD}${BL}
   \\____/|_|  |_.__/|_|\\__|____/ \\___||___/_|\\_\\
 ${CL}
   Single-file Proxmox LXC installer
+  Repo: https://github.com/nasagreir/orbitdesk
 EOF
 }
 
@@ -58,16 +99,25 @@ need_proxmox() {
   [[ "${EUID}" -eq 0 ]] || msg_error "Run as root on the Proxmox host."
   command -v pveversion >/dev/null || msg_error "Not a Proxmox host (pveversion missing)."
   command -v pct >/dev/null || msg_error "pct missing."
+  command -v pvesm >/dev/null || msg_error "pvesm missing."
+  command -v pveam >/dev/null || msg_error "pveam missing."
 }
 
 prompt() {
   local var="$1" label="$2" default="$3" value
+  if [[ "${AUTO_YES}" -eq 1 ]]; then
+    printf -v "${var}" '%s' "${default}"
+    return
+  fi
   read -r -p "${label} [${default}]: " value || true
   printf -v "${var}" '%s' "${value:-$default}"
 }
 
 confirm_yn() {
   local p="$1" d="${2:-y}" a
+  if [[ "${AUTO_YES}" -eq 1 ]]; then
+    return 0
+  fi
   read -r -p "${p} [${d}]: " a || true
   [[ "${a:-$d}" =~ ^[Yy]$ ]]
 }
@@ -80,26 +130,100 @@ next_ctid() {
   echo "${id}"
 }
 
-default_storage() {
+# Prefer "local" for templates; never pick LVM-thin for vztmpl.
+storage_supports() {
+  local name="$1" kind="$2"
+  pvesm status -content "${kind}" 2>/dev/null | awk -v n="${name}" 'NR>1 && $1==n {found=1} END{exit !found}'
+}
+
+list_storage() {
+  local kind="$1"
+  pvesm status -content "${kind}" 2>/dev/null | awk 'NR>1 {print $1}'
+}
+
+pick_rootfs_storage() {
   if [[ -n "${ORBITDESK_STORAGE}" ]]; then
+    storage_supports "${ORBITDESK_STORAGE}" rootdir \
+      || msg_error "Storage '${ORBITDESK_STORAGE}' does not support container rootfs (rootdir)."
     echo "${ORBITDESK_STORAGE}"
     return
   fi
-  pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {print $1; exit}'
+
+  # Prefer local-lvm / local-zfs (typical Proxmox install), then anything with rootdir
+  local s
+  for s in local-lvm local-zfs; do
+    if storage_supports "${s}" rootdir; then
+      echo "${s}"
+      return
+    fi
+  done
+  s="$(list_storage rootdir | head -n1)"
+  [[ -n "${s}" ]] || msg_error "No storage with rootdir content (needed for LXC disks)."
+  echo "${s}"
+}
+
+pick_template_storage() {
+  if [[ -n "${ORBITDESK_TEMPLATE_STORAGE}" ]]; then
+    storage_supports "${ORBITDESK_TEMPLATE_STORAGE}" vztmpl \
+      || msg_error "Storage '${ORBITDESK_TEMPLATE_STORAGE}' does not support templates (vztmpl). Use 'local' or another directory store."
+    echo "${ORBITDESK_TEMPLATE_STORAGE}"
+    return
+  fi
+
+  # Prefer local — never use the same LVM-thin volume as rootfs for templates
+  local s
+  if storage_supports local vztmpl; then
+    echo local
+    return
+  fi
+  while read -r s; do
+    [[ -z "${s}" ]] && continue
+    # Skip typical block/thin pools that cannot hold file templates
+    case "${s}" in
+      *-lvm|*-thin|*lvm*) continue ;;
+    esac
+    echo "${s}"
+    return
+  done < <(list_storage vztmpl)
+
+  s="$(list_storage vztmpl | head -n1)"
+  [[ -n "${s}" ]] || msg_error "No storage with vztmpl content. Enable templates on 'local' (Datacenter → Storage → local → Content → Container Templates)."
+  echo "${s}"
+}
+
+default_bridge() {
+  if [[ -n "${ORBITDESK_BRIDGE}" ]] && ip link show "${ORBITDESK_BRIDGE}" &>/dev/null; then
+    echo "${ORBITDESK_BRIDGE}"
+    return
+  fi
+  local b
+  for b in vmbr0 vmbr1; do
+    if ip link show "${b}" &>/dev/null; then
+      echo "${b}"
+      return
+    fi
+  done
+  echo "${ORBITDESK_BRIDGE:-vmbr0}"
 }
 
 pick_template() {
-  local storage="$1" template volid
-  template="$(pveam list "${storage}" 2>/dev/null | awk '/debian-12-standard/ {print $1; exit}')"
+  local tmpl_storage="$1" template volid
+  template="$(pveam list "${tmpl_storage}" 2>/dev/null | awk '/debian-12-standard/ {print $1; exit}')"
   if [[ -z "${template}" ]]; then
-    msg_info "Downloading Debian 12 template to ${storage}"
-    pveam update >/dev/null
+    msg_info "Downloading Debian 12 template → storage '${tmpl_storage}' (not rootfs storage)"
+    pveam update >/dev/null || true
     volid="$(pveam available -section system 2>/dev/null | awk '/debian-12-standard/ {print $2; exit}')"
-    [[ -n "${volid}" ]] || msg_error "debian-12-standard template not found."
-    pveam download "${storage}" "${volid}"
-    template="$(pveam list "${storage}" 2>/dev/null | awk '/debian-12-standard/ {print $1; exit}')"
+    if [[ -z "${volid}" ]]; then
+      # Fallback: any debian-12 listing
+      volid="$(pveam available 2>/dev/null | awk '/debian-12-standard/ {print $2; exit}')"
+    fi
+    [[ -n "${volid}" ]] || msg_error "debian-12-standard template not found in pveam available."
+    if ! pveam download "${tmpl_storage}" "${volid}"; then
+      msg_error "Failed to download template to '${tmpl_storage}'. That storage must support 'vztmpl' (use local, not local-lvm)."
+    fi
+    template="$(pveam list "${tmpl_storage}" 2>/dev/null | awk '/debian-12-standard/ {print $1; exit}')"
   fi
-  [[ -n "${template}" ]] || msg_error "Template missing on ${storage}."
+  [[ -n "${template}" ]] || msg_error "Template missing on ${tmpl_storage}."
   echo "${template}"
 }
 
@@ -123,21 +247,37 @@ gather() {
   header
   echo
   msg_info "Creates a Debian 12 LXC and installs ${APP} on port ${ORBITDESK_PORT}."
+  if [[ "${AUTO_YES}" -eq 1 ]]; then
+    msg_ok "Automatic mode — using detected defaults (pass flags interactively by running without --yes)."
+  fi
   echo
 
   CTID="${ORBITDESK_CTID:-$(next_ctid)}"
   prompt CTID "LXC CT ID" "${CTID}"
-  pct status "${CTID}" &>/dev/null && msg_error "CT ${CTID} already exists."
+  pct status "${CTID}" &>/dev/null && msg_error "CT ${CTID} already exists. Set ORBITDESK_CTID=… or remove it."
 
-  prompt HN "Hostname" "${ORBITDESK_HOSTNAME}"
-  prompt CORES "CPU cores" "${ORBITDESK_CORES}"
-  prompt MEMORY "Memory (MiB)" "${ORBITDESK_MEMORY}"
-  prompt DISK "Disk size (GiB)" "${ORBITDESK_DISK}"
-  prompt BRIDGE "Bridge" "${ORBITDESK_BRIDGE}"
+  HN="${ORBITDESK_HOSTNAME}"
+  CORES="${ORBITDESK_CORES}"
+  MEMORY="${ORBITDESK_MEMORY}"
+  DISK="${ORBITDESK_DISK}"
+  BRIDGE="$(default_bridge)"
+  STORAGE="$(pick_rootfs_storage)"
+  TEMPLATE_STORAGE="$(pick_template_storage)"
 
-  STORAGE="$(default_storage)"
-  [[ -n "${STORAGE}" ]] || msg_error "No storage with rootdir content."
-  prompt STORAGE "Storage" "${STORAGE}"
+  if [[ "${AUTO_YES}" -eq 0 ]]; then
+    prompt HN "Hostname" "${HN}"
+    prompt CORES "CPU cores" "${CORES}"
+    prompt MEMORY "Memory (MiB)" "${MEMORY}"
+    prompt DISK "Disk size (GiB)" "${DISK}"
+    prompt BRIDGE "Bridge" "${BRIDGE}"
+    prompt STORAGE "Rootfs storage (rootdir)" "${STORAGE}"
+    prompt TEMPLATE_STORAGE "Template storage (vztmpl)" "${TEMPLATE_STORAGE}"
+  fi
+
+  storage_supports "${STORAGE}" rootdir \
+    || msg_error "Storage '${STORAGE}' does not support rootdir."
+  storage_supports "${TEMPLATE_STORAGE}" vztmpl \
+    || msg_error "Storage '${TEMPLATE_STORAGE}' does not support vztmpl (templates). Use 'local', not 'local-lvm'."
 
   if [[ "${LOCAL_MODE}" -eq 1 ]]; then
     msg_ok "Local repo detected at ${REPO_ROOT} — will copy into the CT."
@@ -145,30 +285,42 @@ gather() {
   else
     SOURCE_MODE="git"
     ORBITDESK_REPO="${ORBITDESK_REPO:-${ORBITDESK_GITHUB_URL}}"
-    echo
-    msg_info "Source: ${ORBITDESK_REPO} (branch ${ORBITDESK_BRANCH})"
-    msg_info "One-liner: bash -c \"\$(curl -fsSL ${ORBITDESK_GITHUB_RAW}/main/proxmox-install.sh)\""
-    prompt ORBITDESK_REPO "OrbitDesk git URL" "${ORBITDESK_REPO}"
+    if [[ "${AUTO_YES}" -eq 0 ]]; then
+      echo
+      msg_info "Source: ${ORBITDESK_REPO} (branch ${ORBITDESK_BRANCH})"
+      prompt ORBITDESK_REPO "OrbitDesk git URL" "${ORBITDESK_REPO}"
+      prompt ORBITDESK_BRANCH "Git branch" "${ORBITDESK_BRANCH}"
+    fi
     [[ -n "${ORBITDESK_REPO}" ]] || msg_error "ORBITDESK_REPO is required when not run from a local clone."
-    prompt ORBITDESK_BRANCH "Git branch" "${ORBITDESK_BRANCH}"
+  fi
+
+  if [[ "${AUTO_YES}" -eq 0 ]]; then
+    echo
+    msg_info "Optional integrations (Enter skips — demo mode still works)"
+    prompt HOME_ASSISTANT_URL "Home Assistant URL" "${HOME_ASSISTANT_URL}"
+    prompt HOME_ASSISTANT_TOKEN "Home Assistant token" "${HOME_ASSISTANT_TOKEN}"
+    prompt GROK_API_KEY "Grok / xAI API key" "${GROK_API_KEY}"
   fi
 
   echo
-  msg_info "Optional integrations (Enter skips — demo mode still works)"
-  prompt HOME_ASSISTANT_URL "Home Assistant URL" "${HOME_ASSISTANT_URL}"
-  prompt HOME_ASSISTANT_TOKEN "Home Assistant token" "${HOME_ASSISTANT_TOKEN}"
-  prompt GROK_API_KEY "Grok / xAI API key" "${GROK_API_KEY}"
-
-  echo
-  echo "  CT ${CTID} · ${HN} · ${CORES}c / ${MEMORY}M / ${DISK}G · ${BRIDGE} · ${SOURCE_MODE}"
+  echo "  Plan"
+  echo "  ----"
+  echo "  CT ID            : ${CTID}"
+  echo "  Hostname         : ${HN}"
+  echo "  Resources        : ${CORES}c / ${MEMORY}M RAM / ${DISK}G disk"
+  echo "  Bridge           : ${BRIDGE}"
+  echo "  Rootfs storage   : ${STORAGE}"
+  echo "  Template storage : ${TEMPLATE_STORAGE}"
+  echo "  Source           : ${SOURCE_MODE} (${ORBITDESK_REPO:-local} @ ${ORBITDESK_BRANCH})"
+  echo "  App port         : ${ORBITDESK_PORT}"
   echo
   confirm_yn "Install ${APP} now?" "y" || msg_error "Aborted."
 }
 
 create_ct() {
   local template password=""
-  template="$(pick_template "${STORAGE}")"
-  msg_info "Creating CT ${CTID}"
+  template="$(pick_template "${TEMPLATE_STORAGE}")"
+  msg_info "Creating CT ${CTID} (template ${template} → rootfs ${STORAGE}:${DISK})"
 
   local -a args=(
     create "${CTID}" "${template}"
@@ -182,6 +334,7 @@ create_ct() {
     --features nesting=1
     --onboot 1
     --ostype debian
+    --start 0
   )
   if [[ -f /root/.ssh/authorized_keys ]]; then
     args+=(--ssh-public-keys /root/.ssh/authorized_keys)
@@ -189,7 +342,10 @@ create_ct() {
     password="$(openssl rand -base64 18)"
     args+=(--password "${password}")
   fi
-  pct "${args[@]}" >/dev/null
+
+  if ! pct "${args[@]}"; then
+    msg_error "pct create failed. Template storage must support vztmpl; rootfs storage must support rootdir."
+  fi
   msg_ok "CT ${CTID} created"
   [[ -z "${password}" ]] || msg_warn "CT root password: ${password}"
 }
@@ -198,14 +354,14 @@ start_ct() {
   msg_info "Starting CT ${CTID}"
   pct start "${CTID}"
   local i
-  for i in $(seq 1 60); do
+  for i in $(seq 1 90); do
     if pct exec "${CTID}" -- bash -c 'hostname -I | grep -qE "[0-9]+\.[0-9]+"' 2>/dev/null; then
       msg_ok "Network is up"
       return
     fi
     sleep 2
   done
-  msg_warn "No DHCP address yet — continuing"
+  msg_warn "No DHCP address yet — continuing (app may come up once networking works)"
 }
 
 # In-container installer (embedded — this file is the only thing you need)
@@ -227,7 +383,7 @@ err(){ echo -e "\033[1;31m[orbitdesk]\033[0m $*" >&2; exit 1; }
 
 msg "Installing base packages"
 apt-get update -y
-apt-get install -y --no-install-recommends ca-certificates curl git gnupg jq build-essential python3 tar tini
+apt-get install -y --no-install-recommends ca-certificates curl git gnupg jq build-essential python3 tar tini rsync
 
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | sed 's/^v//;s/\..*//')" -lt "${NODE_MAJOR}" ]]; then
   msg "Installing Node.js ${NODE_MAJOR}.x"

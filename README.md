@@ -25,10 +25,14 @@ Repo: [github.com/nasagreir/orbitdesk](https://github.com/nasagreir/orbitdesk)
 On the **Proxmox host** as root — one script, one paste:
 
 ```bash
+# Fully automatic (recommended)
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)" -- --yes
+
+# Or interactive prompts
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 ```
 
-The installer clones `https://github.com/nasagreir/orbitdesk.git` (branch `main`) into the LXC unless you override `ORBITDESK_REPO`.
+The installer auto-picks **template storage** (`local` / vztmpl) separately from **rootfs storage** (`local-lvm` / rootdir), so LVM-thin hosts no longer fail with “storage does not support templates”. It clones `https://github.com/nasagreir/orbitdesk.git` (branch `main`) unless you override `ORBITDESK_REPO`.
 
 Creates a Debian 12 LXC, builds OrbitDesk, and enables `orbitdesk.service` on port **3456**. Open the URL and create your operator username / password on the first-start page.
 

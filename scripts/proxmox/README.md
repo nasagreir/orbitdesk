@@ -7,10 +7,16 @@ One file: [`proxmox-install.sh`](../../proxmox-install.sh) at the repo root.
 ### One-liner (raw URL)
 
 ```bash
+# Automatic (no prompts)
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)" -- --yes
+
+# Interactive
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/nasagreir/orbitdesk/main/proxmox-install.sh)"
 ```
 
 Repo: https://github.com/nasagreir/orbitdesk
+
+Templates download to a **vztmpl** store (`local`); the CT disk uses a **rootdir** store (`local-lvm` / `local-zfs`).
 
 ### Or paste the whole script
 
