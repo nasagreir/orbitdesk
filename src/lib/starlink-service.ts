@@ -7,16 +7,21 @@ import {
 } from "@/lib/history";
 import {
   callStarlinkService,
-  checkHomeAssistant,
-  fetchStarlinkDevicesFromHa,
+  checkHomeAssistantTarget,
+  fetchStarlinkDevicesFromTarget,
 } from "@/lib/home-assistant";
 import { buildMockDashboard, buildMockThroughput } from "@/lib/mock-data";
+import { getStoredSite, listStoredSites, splitScopedDeviceId } from "@/lib/sites";
+import type { StoredSite } from "@/lib/sites";
 import type {
   DashboardPayload,
+  SiteStatus,
   StarlinkAction,
   StarlinkDevice,
   ThroughputPoint,
+  VpnStatus,
 } from "@/lib/types";
+import { readPeerStatus } from "@/lib/wireguard";
 
 async function persistHistory(devices: StarlinkDevice[]) {
   try {
@@ -108,121 +113,355 @@ function synthesizeThroughput(
   });
 }
 
-export async function getDashboard(): Promise<DashboardPayload> {
-  const { demoModeForced } = getAppConfig();
-  const ha = getHomeAssistantConfig();
-  const grok = getGrokConfig();
-  const grokStatus = await checkGrok();
+function filterByEntityPrefix(
+  devices: StarlinkDevice[],
+  prefix: string,
+): StarlinkDevice[] {
+  const normalized = prefix.trim();
+  if (!normalized) return devices;
+  return devices.filter((device) =>
+    (device.haEntityPrefix ?? "").startsWith(normalized),
+  );
+}
 
-  if (demoModeForced || !ha.configured) {
-    const demo = buildMockDashboard();
-    demo.status.grok = {
-      configured: grok.configured,
-      reachable: grokStatus.reachable,
-      message: grokStatus.message,
-    };
-    if (ha.configured) {
-      demo.status.homeAssistant = {
-        configured: true,
+function tagLocal(devices: StarlinkDevice[]): StarlinkDevice[] {
+  return devices.map((device) => ({
+    ...device,
+    siteId: "local",
+    siteName: "This site",
+    viaVpn: false,
+  }));
+}
+
+function tagRemote(site: StoredSite, devices: StarlinkDevice[]): StarlinkDevice[] {
+  return devices.map((device) => ({
+    ...device,
+    id: `${site.id}:${device.id}`,
+    siteId: site.id,
+    siteName: site.name,
+    viaVpn: true,
+  }));
+}
+
+function vpnSummary(sites: SiteStatus[]): VpnStatus {
+  const remote = sites.filter((site) => site.viaVpn);
+  const reachable = remote.filter((site) => site.reachable).length;
+  const message =
+    remote.length === 0
+      ? "No remote sites saved"
+      : reachable === remote.length
+        ? `${reachable} remote site${reachable === 1 ? "" : "s"} reachable`
+        : `${reachable} of ${remote.length} remote sites reachable`;
+  return {
+    configuredSites: remote.length,
+    reachableSites: reachable,
+    message,
+  };
+}
+
+interface PolledSite {
+  ok: boolean;
+  devices: StarlinkDevice[];
+  status: SiteStatus;
+}
+
+async function pollLocal(): Promise<
+  PolledSite & {
+    homeAssistant: DashboardPayload["status"]["homeAssistant"];
+  }
+> {
+  const ha = getHomeAssistantConfig();
+  if (!ha.configured) {
+    return {
+      ok: false,
+      devices: [],
+      homeAssistant: {
+        configured: false,
         reachable: false,
-        url: ha.url,
-        message: "FORCE_DEMO_MODE is enabled",
-      };
-    }
-    demo.devices = await applyDevicePrefs(demo.devices);
-    await persistHistory(demo.devices);
-    return demo;
+        message:
+          "Demo mode — set HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN to go live",
+      },
+      status: {
+        id: "local",
+        name: "This site",
+        reachable: false,
+        message: "Home Assistant is not configured on this host",
+        viaVpn: false,
+        deviceCount: 0,
+      },
+    };
   }
 
-  const haCheck = await checkHomeAssistant();
-  if (!haCheck.reachable) {
-    const demo = buildMockDashboard();
-    demo.status = {
-      mode: "demo",
+  const target = { url: ha.url, token: ha.token };
+  const check = await checkHomeAssistantTarget(target, false);
+  if (!check.reachable) {
+    return {
+      ok: false,
+      devices: [],
       homeAssistant: {
         configured: true,
         reachable: false,
         url: ha.url,
-        message: haCheck.message,
+        message: check.message,
       },
-      grok: {
-        configured: grok.configured,
-        reachable: grokStatus.reachable,
-        message: grokStatus.message,
+      status: {
+        id: "local",
+        name: "This site",
+        reachable: false,
+        message: check.message,
+        viaVpn: false,
+        deviceCount: 0,
       },
     };
-    demo.devices = await applyDevicePrefs(demo.devices);
-    await persistHistory(demo.devices);
-    return demo;
   }
 
   try {
-    const devices = await applyDevicePrefs(await fetchStarlinkDevicesFromHa());
-    const primary = devices.find((d) => d.health === "online") ?? devices[0];
-    await persistHistory(devices);
+    const devices = tagLocal(await fetchStarlinkDevicesFromTarget(target, false));
+    const message =
+      devices.length === 0
+        ? "Connected, no Starlink entities on this host"
+        : check.message;
     return {
-      status: {
-        mode: "live",
-        homeAssistant: {
-          configured: true,
-          reachable: true,
-          url: ha.url,
-          message: haCheck.message,
-        },
-        grok: {
-          configured: grok.configured,
-          reachable: grokStatus.reachable,
-          message: grokStatus.message,
-        },
-      },
+      ok: true,
       devices,
-      throughput: synthesizeThroughput(
-        primary?.downlinkMbps ?? 0,
-        primary?.uplinkMbps ?? 0,
-      ),
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    const demo = buildMockDashboard();
-    demo.status = {
-      mode: "demo",
       homeAssistant: {
         configured: true,
         reachable: true,
         url: ha.url,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to map Starlink entities",
+        message,
       },
-      grok: {
-        configured: grok.configured,
-        reachable: grokStatus.reachable,
-        message: grokStatus.message,
+      status: {
+        id: "local",
+        name: "This site",
+        reachable: true,
+        message,
+        viaVpn: false,
+        deviceCount: devices.length,
       },
     };
-    demo.devices = await applyDevicePrefs(demo.devices);
-    await persistHistory(demo.devices);
-    return demo;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to map Starlink entities";
+    return {
+      ok: false,
+      devices: [],
+      homeAssistant: {
+        configured: true,
+        reachable: true,
+        url: ha.url,
+        message,
+      },
+      status: {
+        id: "local",
+        name: "This site",
+        reachable: false,
+        message,
+        viaVpn: false,
+        deviceCount: 0,
+      },
+    };
   }
 }
 
+async function pollRemote(site: StoredSite): Promise<PolledSite> {
+  const target = { url: site.haUrl, token: site.haToken };
+  const [tunnel, check] = await Promise.all([
+    readPeerStatus(site.wireguard.interfaceName, site.wireguard.peerPublicKey),
+    checkHomeAssistantTarget(target, true),
+  ]);
+  if (!check.reachable) {
+    const message = tunnel.available
+      ? `${check.message}. ${tunnel.message}`
+      : check.message;
+    return {
+      ok: false,
+      devices: [],
+      status: {
+        id: site.id,
+        name: site.name,
+        reachable: false,
+        message,
+        viaVpn: true,
+        deviceCount: 0,
+      },
+    };
+  }
+
+  try {
+    const devices = tagRemote(
+      site,
+      filterByEntityPrefix(
+        await fetchStarlinkDevicesFromTarget(target, true),
+        site.entityPrefix,
+      ),
+    );
+    const haMessage =
+      devices.length === 0
+        ? "Connected, no Starlink entities at this site"
+        : "Connected to Home Assistant";
+    return {
+      ok: true,
+      devices,
+      status: {
+        id: site.id,
+        name: site.name,
+        reachable: true,
+        message: `${haMessage}. ${tunnel.message}`,
+        viaVpn: true,
+        deviceCount: devices.length,
+      },
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to map Starlink entities";
+    return {
+      ok: false,
+      devices: [],
+      status: {
+        id: site.id,
+        name: site.name,
+        reachable: false,
+        message,
+        viaVpn: true,
+        deviceCount: 0,
+      },
+    };
+  }
+}
+
+async function demoFallback(
+  homeAssistant: DashboardPayload["status"]["homeAssistant"],
+  grok: DashboardPayload["status"]["grok"],
+  sites: SiteStatus[] | undefined,
+): Promise<DashboardPayload> {
+  const demo = buildMockDashboard();
+  demo.status.homeAssistant = homeAssistant;
+  demo.status.grok = grok;
+  const savedRemote = (sites ?? []).some((site) => site.viaVpn);
+  if (savedRemote && sites) {
+    demo.devices = demo.devices.filter((device) => !device.viaVpn);
+    demo.status.sites = sites;
+    demo.status.vpn = vpnSummary(sites);
+    demo.status.homeAssistant = {
+      ...homeAssistant,
+      message: `${homeAssistant.message}. No live site answered, so demo dishes are shown.`,
+    };
+  }
+  demo.devices = await applyDevicePrefs(demo.devices);
+  await persistHistory(demo.devices);
+  return demo;
+}
+
+export async function getDashboard(): Promise<DashboardPayload> {
+  const { demoModeForced } = getAppConfig();
+  const grok = getGrokConfig();
+  const grokStatus = await checkGrok();
+  const grokBlock = {
+    configured: grok.configured,
+    reachable: grokStatus.reachable,
+    message: grokStatus.message,
+  };
+
+  if (demoModeForced) {
+    const ha = getHomeAssistantConfig();
+    return demoFallback(
+      {
+        configured: ha.configured,
+        reachable: false,
+        url: ha.configured ? ha.url : undefined,
+        message: ha.configured
+          ? "FORCE_DEMO_MODE is enabled"
+          : "Demo mode — set HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN to go live",
+      },
+      grokBlock,
+      undefined,
+    );
+  }
+
+  const saved = await listStoredSites();
+  const [local, ...remotes] = await Promise.all([
+    pollLocal(),
+    ...saved.map((site) => pollRemote(site)),
+  ]);
+
+  const siteStatuses = [local.status, ...remotes.map((remote) => remote.status)];
+  const liveDevices = [
+    ...local.devices,
+    ...remotes.flatMap((remote) => remote.devices),
+  ];
+  const anyLive = local.ok || remotes.some((remote) => remote.ok);
+
+  if (!anyLive) {
+    return demoFallback(local.homeAssistant, grokBlock, siteStatuses);
+  }
+
+  const devices = await applyDevicePrefs(liveDevices);
+  const primary = devices.find((device) => device.health === "online") ?? devices[0];
+  await persistHistory(devices);
+  return {
+    status: {
+      mode: "live",
+      homeAssistant: local.homeAssistant,
+      grok: grokBlock,
+      sites: siteStatuses,
+      vpn: vpnSummary(siteStatuses),
+    },
+    devices,
+    throughput: synthesizeThroughput(
+      primary?.downlinkMbps ?? 0,
+      primary?.uplinkMbps ?? 0,
+    ),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 export async function runDeviceAction(
-  deviceId: string,
+  scopedId: string,
   action: StarlinkAction | "roam_on" | "roam_off",
 ): Promise<{ ok: boolean; message: string; demo?: boolean }> {
-  const ha = getHomeAssistantConfig();
   const { demoModeForced } = getAppConfig();
+  const { siteId, deviceId } = splitScopedDeviceId(scopedId);
 
+  if (siteId) {
+    if (demoModeForced) {
+      return {
+        ok: true,
+        demo: true,
+        message: `Demo: ${action} queued for ${scopedId}. Turn off FORCE_DEMO_MODE to run it at the remote site.`,
+      };
+    }
+    const site = await getStoredSite(siteId);
+    if (!site) {
+      return {
+        ok: true,
+        demo: true,
+        message: `Demo: ${action} queued for ${scopedId}. Save the site under Connections to execute for real.`,
+      };
+    }
+    const check = await checkHomeAssistantTarget(
+      { url: site.haUrl, token: site.haToken },
+      true,
+    );
+    if (!check.reachable) return { ok: false, message: check.message };
+    return callStarlinkService(action, deviceId, {
+      url: site.haUrl,
+      token: site.haToken,
+    });
+  }
+
+  const ha = getHomeAssistantConfig();
   if (demoModeForced || !ha.configured) {
     return {
       ok: true,
       demo: true,
-      message: `Demo: ${action} queued for ${deviceId}. Connect Home Assistant to execute for real.`,
+      message: `Demo: ${action} queued for ${scopedId}. Connect Home Assistant to execute for real.`,
     };
   }
 
-  const haCheck = await checkHomeAssistant();
+  const haCheck = await checkHomeAssistantTarget(
+    { url: ha.url, token: ha.token },
+    false,
+  );
   if (!haCheck.reachable) {
     return { ok: false, message: haCheck.message };
   }

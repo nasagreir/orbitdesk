@@ -32,12 +32,32 @@ export interface StarlinkDevice {
   wanFailoverNote?: string;
   /** True when travel or WAN failover has paused offline/down alarming */
   alarmsPaused?: boolean;
+  /** Fleet site this dish belongs to. Local dishes use "local". */
+  siteId?: string;
+  siteName?: string;
+  /** True when the dish is reached through a WireGuard remote site */
+  viaVpn?: boolean;
 }
 
 export interface ThroughputPoint {
   time: string;
   downlink: number;
   uplink: number;
+}
+
+export interface SiteStatus {
+  id: string;
+  name: string;
+  reachable: boolean;
+  message: string;
+  viaVpn: boolean;
+  deviceCount: number;
+}
+
+export interface VpnStatus {
+  configuredSites: number;
+  reachableSites: number;
+  message: string;
 }
 
 export interface IntegrationStatus {
@@ -53,6 +73,50 @@ export interface IntegrationStatus {
     message: string;
   };
   mode: ConnectionMode;
+  /** Present when the fleet includes more than the local Home Assistant */
+  sites?: SiteStatus[];
+  vpn?: VpnStatus;
+}
+
+export interface WireGuardPublic {
+  interfaceName: string;
+  address: string;
+  listenPort?: number;
+  endpoint: string;
+  peerPublicKey: string;
+  allowedIps: string;
+  persistentKeepalive: number;
+  publicKey: string;
+  hasPrivateKey: boolean;
+}
+
+export interface RemoteSitePublic {
+  id: string;
+  name: string;
+  haUrl: string;
+  hasToken: boolean;
+  entityPrefix: string;
+  wireguard: WireGuardPublic;
+  createdAt: string;
+}
+
+export interface SiteProbeResult {
+  siteId: string;
+  haReachable: boolean;
+  haMessage: string;
+  deviceCount: number;
+  tunnel: {
+    available: boolean;
+    up: boolean;
+    latestHandshake: string | null;
+    message: string;
+  };
+}
+
+export interface SiteConfigPayload {
+  interfaceConf: string;
+  remotePeerSnippet: string;
+  warning: string;
 }
 
 export interface DashboardPayload {

@@ -1,5 +1,13 @@
 import { getHomeAssistantConfig } from "@/lib/config";
+import { assertHaUrlResolvesSafely } from "@/lib/safe-url";
 import type { StarlinkDevice, DeviceHealth } from "@/lib/types";
+
+export interface HaTarget {
+  url: string;
+  token: string;
+}
+
+const HA_TIMEOUT_MS = 5000;
 
 interface HaState {
   entity_id: string;
@@ -190,23 +198,78 @@ function deviceFromGroup(
   };
 }
 
-export async function haFetch(
-  path: string,
-  init?: RequestInit,
-): Promise<Response> {
+function localTarget(): HaTarget {
   const { url, token, configured } = getHomeAssistantConfig();
   if (!configured) {
     throw new Error("Home Assistant is not configured");
   }
-  return fetch(`${url}${path}`, {
+  return { url, token };
+}
+
+export async function haFetchTarget(
+  target: HaTarget,
+  path: string,
+  init?: RequestInit,
+  guard = false,
+): Promise<Response> {
+  if (guard) await assertHaUrlResolvesSafely(target.url);
+  const timeout = AbortSignal.timeout(HA_TIMEOUT_MS);
+  const res = await fetch(`${target.url}${path}`, {
     ...init,
+    redirect: "manual",
+    signal: init?.signal ?? timeout,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${target.token}`,
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
   });
+  if (res.status >= 300 && res.status < 400) {
+    throw new Error("Home Assistant redirected the request; not following it");
+  }
+  return res;
+}
+
+export async function haFetch(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return haFetchTarget(localTarget(), path, init);
+}
+
+export async function checkHomeAssistantTarget(
+  target: HaTarget,
+  guard = false,
+): Promise<{
+  reachable: boolean;
+  message: string;
+  url?: string;
+}> {
+  try {
+    const res = await haFetchTarget(target, "/api/", { method: "GET" }, guard);
+    if (!res.ok) {
+      return {
+        reachable: false,
+        url: target.url,
+        message: `Home Assistant responded ${res.status}`,
+      };
+    }
+    return {
+      reachable: true,
+      url: target.url,
+      message: "Connected to Home Assistant",
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to reach Home Assistant";
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    return {
+      reachable: false,
+      url: target.url,
+      message: timedOut ? "Home Assistant timed out" : message,
+    };
+  }
 }
 
 export async function checkHomeAssistant(): Promise<{
@@ -221,53 +284,54 @@ export async function checkHomeAssistant(): Promise<{
       message: "HOME_ASSISTANT_URL / HOME_ASSISTANT_TOKEN not set",
     };
   }
-  try {
-    const res = await haFetch("/api/", { method: "GET" });
-    if (!res.ok) {
-      return {
-        reachable: false,
-        url,
-        message: `Home Assistant responded ${res.status}`,
-      };
-    }
-    return {
-      reachable: true,
-      url,
-      message: "Connected to Home Assistant",
-    };
-  } catch (error) {
-    return {
-      reachable: false,
-      url,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Failed to reach Home Assistant",
-    };
-  }
+  return checkHomeAssistantTarget({ url, token: getHomeAssistantConfig().token });
 }
 
-export async function fetchStarlinkDevicesFromHa(): Promise<StarlinkDevice[]> {
-  const res = await haFetch("/api/states");
+export async function fetchStarlinkDevicesFromTarget(
+  target: HaTarget,
+  guard = false,
+): Promise<StarlinkDevice[]> {
+  const res = await haFetchTarget(target, "/api/states", undefined, guard);
   if (!res.ok) {
     throw new Error(`Failed to load HA states (${res.status})`);
   }
   const states = (await res.json()) as HaState[];
   const groups = groupStarlinkEntities(states);
   if (groups.size === 0) {
-    throw new Error(
-      "No Starlink entities found in Home Assistant. Install the Starlink integration and expose dish sensors.",
-    );
+    return [];
   }
   return [...groups.entries()].map(([key, groupStates]) =>
     deviceFromGroup(key, groupStates),
   );
 }
 
+export async function fetchStarlinkDevicesFromHa(): Promise<StarlinkDevice[]> {
+  const devices = await fetchStarlinkDevicesFromTarget(localTarget());
+  if (devices.length === 0) {
+    throw new Error(
+      "No Starlink entities found in Home Assistant. Install the Starlink integration and expose dish sensors.",
+    );
+  }
+  return devices;
+}
+
 export async function callStarlinkService(
   action: "reboot" | "stow" | "unstow" | "roam_on" | "roam_off",
   deviceId: string,
+  target?: HaTarget,
 ): Promise<{ ok: boolean; message: string }> {
+  const resolved = target ?? localTarget();
+  const guard = Boolean(target);
+  const request = (path: string, body: unknown) =>
+    haFetchTarget(
+      resolved,
+      path,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      guard,
+    );
   if (action === "roam_on" || action === "roam_off") {
     const entityCandidates = [
       `switch.starlink_${deviceId}_roam`,
@@ -279,9 +343,8 @@ export async function callStarlinkService(
     const service = turnOn ? "turn_on" : "turn_off";
     let lastError = "No matching roam switch entity found";
     for (const entityId of entityCandidates) {
-      const res = await haFetch(`/api/services/switch/${service}`, {
-        method: "POST",
-        body: JSON.stringify({ entity_id: entityId }),
+      const res = await request(`/api/services/switch/${service}`, {
+        entity_id: entityId,
       });
       if (res.ok) {
         return {
@@ -315,9 +378,8 @@ export async function callStarlinkService(
 
   let lastError = "No matching button entity found";
   for (const entityId of candidates) {
-    const res = await haFetch("/api/services/button/press", {
-      method: "POST",
-      body: JSON.stringify({ entity_id: entityId }),
+    const res = await request("/api/services/button/press", {
+      entity_id: entityId,
     });
     if (res.ok) {
       return { ok: true, message: `Pressed ${entityId}` };
@@ -332,9 +394,8 @@ export async function callStarlinkService(
       unstow: ["starlink", "unstow"],
     };
   const [domain, service] = serviceFallback[dishAction];
-  const fallback = await haFetch(`/api/services/${domain}/${service}`, {
-    method: "POST",
-    body: JSON.stringify({ device_id: deviceId }),
+  const fallback = await request(`/api/services/${domain}/${service}`, {
+    device_id: deviceId,
   });
   if (fallback.ok) {
     return { ok: true, message: `Called ${domain}.${service}` };

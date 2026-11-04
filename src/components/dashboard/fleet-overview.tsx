@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { SiteStatus } from "@/lib/types";
 import { DeviceCard } from "@/components/dashboard/device-card";
 import { GrokAssistant } from "@/components/dashboard/grok-assistant";
 import { StatusBanner } from "@/components/dashboard/status-banner";
@@ -17,10 +18,44 @@ export function FleetOverview() {
   const layout = useViewportLayout();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
+  const [siteFilter, setSiteFilter] = useState("all");
 
   const devices = useMemo(() => data?.devices ?? [], [data?.devices]);
+  const siteOptions = useMemo(() => {
+    const map = new Map<string, { name: string; viaVpn: boolean }>();
+    for (const site of data?.status.sites ?? []) {
+      map.set(site.id, { name: site.name, viaVpn: site.viaVpn });
+    }
+    for (const device of devices) {
+      if (!device.siteId || map.has(device.siteId)) continue;
+      map.set(device.siteId, {
+        name: device.siteName ?? device.siteId,
+        viaVpn: Boolean(device.viaVpn),
+      });
+    }
+    return [...map.entries()];
+  }, [data?.status.sites, devices]);
+  const showSites = siteOptions.length > 1;
+  const activeFilter =
+    siteFilter !== "all" && siteOptions.some(([id]) => id === siteFilter)
+      ? siteFilter
+      : "all";
+  const visibleDevices =
+    activeFilter === "all"
+      ? devices
+      : devices.filter((device) => device.siteId === activeFilter);
   const selected =
-    devices.find((d) => d.id === selectedId) ?? devices[0] ?? null;
+    visibleDevices.find((d) => d.id === selectedId) ??
+    visibleDevices[0] ??
+    null;
+  const quietSites = useMemo(() => {
+    const covered = new Set(visibleDevices.map((device) => device.siteId));
+    return (data?.status.sites ?? []).filter((site) => {
+      if (activeFilter !== "all" && site.id !== activeFilter) return false;
+      if (covered.has(site.id)) return false;
+      return !site.reachable || site.deviceCount === 0;
+    });
+  }, [data?.status.sites, activeFilter, visibleDevices]);
 
   const totals = useMemo(() => {
     const online = devices.filter((d) => d.health === "online").length;
@@ -112,6 +147,25 @@ export function FleetOverview() {
         </div>
       )}
 
+      {showSites && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <SiteChip
+            active={activeFilter === "all"}
+            label="All sites"
+            onClick={() => setSiteFilter("all")}
+          />
+          {siteOptions.map(([id, site]) => (
+            <SiteChip
+              key={id}
+              active={activeFilter === id}
+              label={site.name}
+              vpn={site.viaVpn}
+              onClick={() => setSiteFilter(id)}
+            />
+          ))}
+        </div>
+      )}
+
       <div
         className={cn(
           "adaptive-split duo-hinge-gutter",
@@ -121,7 +175,7 @@ export function FleetOverview() {
         <div className="min-w-0 space-y-4">
           <ThroughputChart data={data.throughput} compact={compact} />
           <div className="grid gap-3 sm:gap-4">
-            {devices.map((device) => (
+            {visibleDevices.map((device) => (
               <DeviceCard
                 key={`${device.id}-${device.modelId ?? "none"}-${device.roamEnabled ? "roam" : "home"}-${device.wanFailover ? "failover" : "primary"}-${device.roamNote ?? ""}-${device.wanFailoverNote ?? ""}`}
                 device={device}
@@ -130,7 +184,11 @@ export function FleetOverview() {
                 onActionDone={setActionNote}
                 onDeviceUpdated={() => void reload()}
                 compact={layout.mode === "mobile"}
+                showSite={showSites}
               />
+            ))}
+            {quietSites.map((site) => (
+              <QuietSiteCard key={site.id} site={site} />
             ))}
           </div>
         </div>
@@ -150,6 +208,64 @@ export function FleetOverview() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SiteChip({
+  label,
+  active,
+  vpn = false,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  vpn?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm",
+        active
+          ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
+          : "border-white/10 bg-white/5 text-slate-300",
+      )}
+    >
+      {vpn && <Shield className="size-3.5" />}
+      {label}
+    </button>
+  );
+}
+
+function QuietSiteCard({ site }: { site: SiteStatus }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-[#0c1622]/80 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-heading text-lg text-white">{site.name}</h3>
+        <span
+          className={cn(
+            "rounded-full border px-2 py-0.5 text-xs",
+            site.reachable
+              ? "border-amber-300/40 text-amber-200"
+              : "border-rose-400/40 text-rose-200",
+          )}
+        >
+          {site.reachable ? "no dishes" : "unreachable"}
+        </span>
+        {site.viaVpn && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 px-2 py-0.5 text-xs text-cyan-100">
+            <Shield className="size-3" />
+            VPN
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-sm text-slate-400">{site.message}</p>
+      <p className="mt-1 text-sm text-slate-500">
+        No telemetry from this site.
+      </p>
+    </article>
   );
 }
 

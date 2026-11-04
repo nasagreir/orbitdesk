@@ -521,7 +521,10 @@ err(){ echo -e "\033[1;31m[orbitdesk]\033[0m $*" >&2; exit 1; }
 
 msg "Installing base packages"
 apt-get update -y
-apt-get install -y --no-install-recommends ca-certificates curl git gnupg jq build-essential python3 tar tini rsync
+# wireguard-tools is for `wg show` when the tunnel interface is visible in
+# this container. Bring the tunnel up on the Proxmox host unless the CT has
+# CAP_NET_ADMIN and /dev/net/tun.
+apt-get install -y --no-install-recommends ca-certificates curl git gnupg jq build-essential python3 tar tini rsync wireguard-tools
 
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | sed 's/^v//;s/\..*//')" -lt "${NODE_MAJOR}" ]]; then
   msg "Installing Node.js ${NODE_MAJOR}.x"

@@ -68,8 +68,8 @@ POLL_INTERVAL_SECONDS=30
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-400 sm:text-base">
           Wire Home Assistant for live Starlink entities and an xAI Grok API key
-          for the ops assistant. Secrets stay server-side in environment
-          variables — nothing is stored in the browser.
+          for the ops assistant. This host&apos;s URL and token stay in
+          environment variables. Remote sites over WireGuard are saved below.
         </p>
       </div>
 

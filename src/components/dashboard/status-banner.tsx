@@ -6,6 +6,11 @@ import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 
 export function StatusBanner({ status }: { status: IntegrationStatus }) {
   const live = status.mode === "live";
+  const title = !live
+    ? "Demo telemetry"
+    : status.homeAssistant.reachable
+      ? "Live Home Assistant feed"
+      : "Live remote sites";
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#0c1622]/80 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -17,9 +22,7 @@ export function StatusBanner({ status }: { status: IntegrationStatus }) {
         )}
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-heading text-base text-white">
-              {live ? "Live Home Assistant feed" : "Demo telemetry"}
-            </p>
+            <p className="font-heading text-base text-white">{title}</p>
             <Badge
               variant="outline"
               className={
@@ -54,6 +57,13 @@ export function StatusBanner({ status }: { status: IntegrationStatus }) {
           label="Grok"
           detail={status.grok.configured ? "API key set" : "needs key"}
         />
+        {status.vpn && status.vpn.configuredSites > 0 && (
+          <Pill
+            ok={status.vpn.reachableSites === status.vpn.configuredSites}
+            label="VPN"
+            detail={`${status.vpn.reachableSites}/${status.vpn.configuredSites} sites`}
+          />
+        )}
       </div>
     </div>
   );

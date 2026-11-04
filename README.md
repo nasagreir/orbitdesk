@@ -10,6 +10,7 @@ Starlink operations dashboard with Home Assistant telemetry and a Grok (xAI) ass
 - Transparent product cutouts for each dish model (Mini, Gen 2/3, High Performance, Flat HP)
 - Mini **travel / roam** mode — trip notes, and offline/down alarming is paused while traveling
 - **WAN failover** status — mark a dish as the backup circuit so idle or down is not an alert
+- Remote sites over WireGuard: poll each site's Home Assistant and show those dishes on the fleet
 - Device actions: reboot / stow / unstow via Home Assistant button entities
 - Grok ops chat grounded in the current dish snapshot
 - First-start landing page to choose your username and password
@@ -82,6 +83,25 @@ HOME_ASSISTANT_URL=http://homeassistant.local:8123
 HOME_ASSISTANT_TOKEN=your-token
 ```
 
+## Monitor other sites (WireGuard)
+
+OrbitDesk can watch dishes at other places you already reach with WireGuard — a cabin, shop, or outbuilding with its own Home Assistant. The app stores each site, probes that Home Assistant, and tags those dishes on the fleet. It does not bring the tunnel up.
+
+1. Open **Connections** and add a remote site: name, that site's Home Assistant URL (the private address on the tunnel), a long-lived token, the remote peer's public key, endpoint, allowed IPs, and this host's tunnel address.
+2. Copy the generated `[Interface]` block onto the machine that owns the tunnel, and the `[Peer]` block onto the remote site. Tokens and the private key stay in the data directory (`ORBITDESK_DATA_DIR`, or `data/sites.json` in local dev).
+3. On a Proxmox install the supported place for the tunnel is the **host**, with routes forwarded into the container. Run WireGuard inside the LXC only when the container has `CAP_NET_ADMIN`, `/dev/net/tun`, and `wireguard-tools`.
+
+`wg show` inside the container reports the handshake when the interface is visible there. If it is not, OrbitDesk still polls Home Assistant and says the tunnel status is unavailable.
+
+```bash
+# On the Proxmox host, after copying the generated config
+wg-quick up wg-orbit
+# Confirm the route, then from the container:
+curl -sS -o /dev/null -w '%{http_code}\n' http://10.77.0.2:8123/api/
+```
+
+Reboot, stow, unstow, and roam on a remote dish call that site's Home Assistant, not the one in `.env.local`.
+
 ## Connect Grok
 
 ```env
@@ -104,5 +124,5 @@ GROK_API_KEY=xai-...
 
 - Dish thumbnails are photographs of the real terminals, cropped to a transparent PNG. Mini: still from [Overland Calling, CC BY 3.0](https://commons.wikimedia.org/wiki/File:Starlink_Mini_Overland_and_Camping_Power_Testing.webm). Standard Gen 2: [U.S. Air Force / DVIDS, public domain](https://commons.wikimedia.org/wiki/File:Project-_Go-Comm_(7171249).jpg). Standard Gen 3: [BugWarp, CC BY-SA 4.0](https://commons.wikimedia.org/wiki/File:Starlink_antenna_at_St._Albans_-_BugWarp.jpg). High Performance: [Wikideas1, CC0](https://commons.wikimedia.org/wiki/File:Starlink_dish_02.webp). Flat High Performance: [Tony Webster, CC BY 2.0](https://commons.wikimedia.org/wiki/File:Starlink_Flat_Panel_Roof_Mounted_on_Roof_Rack_(53370205462).jpg).
 - Secrets stay server-side; the browser only talks to OrbitDesk API routes.
-- If HA is configured but unreachable (or no Starlink entities exist), the UI falls back to demo dishes and surfaces the connection message.
+- If no Home Assistant answers (this host or a saved remote site), the UI falls back to demo dishes and surfaces the connection message. A site that does answer is shown live on its own, without demo dishes mixed in.
 - Layout covers Safari’s Duo viewport range (~382–951 CSS px): bottom nav on phones, two-pane fleet/Grok from ~720px, hinge-aware gutters on the Duo inner display, and Viewport Segments / Device Posture when those Safari feature flags are on.

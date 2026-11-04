@@ -8,6 +8,7 @@ import {
   MapPinned,
   RotateCcw,
   Router,
+  Shield,
   ShieldAlert,
   Signal,
 } from "lucide-react";
@@ -46,6 +47,7 @@ export function DeviceCard({
   onActionDone,
   onDeviceUpdated,
   compact = false,
+  showSite = false,
 }: {
   device: StarlinkDevice;
   selected: boolean;
@@ -53,6 +55,7 @@ export function DeviceCard({
   onActionDone: (message: string) => void;
   onDeviceUpdated?: () => void;
   compact?: boolean;
+  showSite?: boolean;
 }) {
   const [pending, setPending] = useState<
     StarlinkAction | "roam" | "failover" | null
@@ -66,11 +69,12 @@ export function DeviceCard({
   const canRoam = Boolean(model?.supportsRoam);
   const alarmsPaused = Boolean(device.alarmsPaused && device.roamEnabled);
   const offlineAlarmsPaused = alarmsPaused && device.health === "offline";
+  const devicePath = `/api/devices/${encodeURIComponent(device.id)}`;
 
   async function runAction(action: StarlinkAction) {
     setPending(action);
     try {
-      const res = await fetch(`/api/devices/${device.id}/action`, {
+      const res = await fetch(`${devicePath}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
@@ -93,7 +97,7 @@ export function DeviceCard({
     wanFailover?: boolean;
     wanFailoverNote?: string;
   }) {
-    const res = await fetch(`/api/devices/${device.id}/prefs`, {
+    const res = await fetch(`${devicePath}/prefs`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -133,7 +137,7 @@ export function DeviceCard({
         roamNote: next ? roamNote || device.roamNote : undefined,
       });
       // Best-effort HA switch when connected
-      await fetch(`/api/devices/${device.id}/action`, {
+      await fetch(`${devicePath}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: next ? "roam_on" : "roam_off" }),
@@ -282,6 +286,19 @@ export function DeviceCard({
                   >
                     <MapPinned className="mr-1 size-3" />
                     Travel mode
+                  </Badge>
+                )}
+                {showSite && device.siteName && (
+                  <Badge
+                    variant="outline"
+                    className={
+                      device.viaVpn
+                        ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-100"
+                        : "border-white/15 text-slate-200"
+                    }
+                  >
+                    {device.viaVpn && <Shield className="mr-1 size-3" />}
+                    {device.siteName}
                   </Badge>
                 )}
               </div>

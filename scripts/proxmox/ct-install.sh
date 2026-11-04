@@ -25,6 +25,8 @@ require_root() {
 install_base() {
   msg "Updating apt and installing base packages"
   apt-get update -y
+  # wireguard-tools reads handshake state. The tunnel itself belongs on
+  # the Proxmox host unless this container has CAP_NET_ADMIN and /dev/net/tun.
   apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -35,7 +37,8 @@ install_base() {
     build-essential \
     python3 \
     tar \
-    tini
+    tini \
+    wireguard-tools
 }
 
 install_node() {
